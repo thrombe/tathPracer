@@ -1,0 +1,7 @@
+1. for parallelisation
+  . 15 something go routines in a infinite loop waiting on chan and quitchan
+  . a goroutine keeps sending pixel{} into chan
+    . pixel has x, y, colors, ...
+  . goroutines fill the colors in pixel{}
+  . then image gets rendered if all goes well
+    . maybe render and dump image even if it crashes (helps with debugging)
