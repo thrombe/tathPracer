@@ -29,34 +29,18 @@ func tath() {
     rht := vector(1, 0, 0)
     up := vector(0, 1, 0)
     topLeft := vector(-float64(width)/2, float64(height)/2, -scrDist)
-    
+        
     camPos := vector(0, 0, 0)
-    sphereC := vector(0, 0, -5)
-    sphereR := 1.0
-    
+    hitSP1 := sphereHitCreate(vector(0, 0, -5), 1)
+
     for y := 0; y < height; y++ {
         for x := 0; x < width; x++ {
             ray := nMatAdd(camPos, topLeft, matScalar(rht, float64(x)), matScalar(up, float64(-y)))
-            // ray = vecUnit(ray)
-            // (b.(a-c))²-b²((a-c)²-r²) a-pos, b-ray, c-center
-            oc := matSub(camPos, sphereC)
-            negB := -vecDot(ray, oc)
-            bSq := vecDot(ray, ray)
-            Dby4 := negB*negB - bSq*(vecDot(oc, oc)-sphereR*sphereR)
-            if Dby4 < 0 {
+            bright, did := hitSP1(camPos, ray)
+            if !did {
                 backgroundPix(x, y, height, set)
                 continue
             }
-            t := (negB - math.Sqrt(Dby4))/bSq // no +ve sqrt(D) cuz we want min anyway
-            if t < 0 { // ray hitting behind the camera
-                backgroundPix(x, y, height, set)
-                continue
-            }
-            intersectionPoint := matScalar(ray, t)
-            intersectionNormal := matSub(intersectionPoint, sphereC)
-            intersectionNormal = vecUnit(intersectionNormal)
-            // set(x, y, round(absVal(255*intersectionNormal[0][0])), round(absVal(255*intersectionNormal[1][0])), round(absVal(255*intersectionNormal[2][0])))
-            bright := vecDot(intersectionNormal, vecUnit(vector(-1, -1, -2)))
             // if y == 480/2 {fmt.Println(bright, intersectionPoint, t, x, y)}
             set(x, y, round(absVal(255*bright)), 0, 0)
         }
@@ -70,5 +54,22 @@ func backgroundPix(x, y, height int, set func(int, int, int, int, int)) {
     grn := 240*(1-t) + t*191
     blu := 255*(1-t) + t*255
     set(x, y, int(rad), int(grn), int(blu))
-    // fmt.Println("nooe")
+}
+
+func sphereHitCreate(center [][]float64, r float64) func([][]float64, [][]float64) (float64, bool) {
+    return func(camPos, ray [][]float64) (float64, bool) {
+        oc := matSub(camPos, center)
+        negB := -vecDot(ray, oc)
+        bSq := vecDot(ray, ray)
+        Dby4 := negB*negB - bSq*(vecDot(oc, oc)-r*r)
+        if Dby4 < 0 {return 0, false} // didnt hit
+        t := (negB - math.Sqrt(Dby4))/bSq // no +ve sqrt(D) cuz we want min anyway
+        if t < 0 {return 0, false} // ray hitting behind the camera
+        intersectionPoint := matScalar(ray, t)
+        intersectionNormal := matSub(intersectionPoint, center)
+        intersectionNormal = vecUnit(intersectionNormal)
+        // set(x, y, round(absVal(255*intersectionNormal[0][0])), round(absVal(255*intersectionNormal[1][0])), round(absVal(255*intersectionNormal[2][0])))
+        bright := vecDot(intersectionNormal, vecUnit(vector(-1, -1, -2)))
+        return bright, true
+    }
 }
