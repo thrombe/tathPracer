@@ -27,7 +27,7 @@ func dumpImg(img *image.RGBA) {
 
 func fileName() string {
     for i := 0;; i++ {
-        name := fmt.Sprintf("/root/0Git/fracGen/images/image%v.png", i)
+        name := fmt.Sprintf("/root/0Git/tathPracer/images/image%v.png", i)
         _, err := os.Stat(name)
         if err != nil {return name}
     }
