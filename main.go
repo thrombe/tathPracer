@@ -19,6 +19,16 @@ func main() {
     tath()
 }
 
+func camInit() *camera {
+    cam := camera{}
+    cam.height = 480
+    cam.width = 720
+    cam.fov = math.Pi/3
+    cot := 1/math.Atan(cam.fov/2)
+    cam.scrDist = (float64(cam.width)/2)*cot
+    return &cam
+}
+
 type camera struct {
     height, width int
     fov, scrDist float64
@@ -28,16 +38,6 @@ type camera struct {
 type pixel struct {
     x, y int
     r, g, b int
-}
-
-func camInit() *camera {
-    cam := camera{}
-    cam.height = 480
-    cam.width = 720
-    cam.fov = math.Pi/3
-    cot := 1/math.Atan(cam.fov/2)
-    cam.scrDist = (float64(cam.width)/2)*cot
-    return &cam
 }
 
 // main func that calls other funcs and handles concurrency
@@ -71,28 +71,9 @@ func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, in
     rht := vector(1, 0, 0)
     up := vector(0, 1, 0)
     topLeft := vector(-float64(cam.width)/2, float64(cam.height)/2, -cam.scrDist)
-        
     cam.camPos = vector(0, 0, 0)
-    howMany := 5
-    groundsp := sphere{}
-    groundsp.center, groundsp.r, groundsp.color = vector(0, -1005, -5), 1000, vector(0, 255, 0)
-    objects := make([]*sphere, howMany+2)
-    objects[0] = &groundsp
-    for i := 1; i < howMany+1; i++ {
-        sp := sphere{}
-        sp.r, sp.color = 1, vector(0, 0, 255)
-        // choosing center by randomly distributing spheres in a small area, then displace it up and forward
-        // then find the centers wrt goundsp center and multiply the unit vectors by something so they end up on surface of gsp
-        // finally add back the gsp.center to displace it back
-        vec := matAdd(vector((rand.Float64()-0.5)*30, 0, (rand.Float64()-0.5)*30), vector(0, groundsp.r+sp.r, -40))
-        vec = matSub(vec, groundsp.center)
-        sp.center = matAdd(matScalar(vec, (groundsp.r+sp.r)/vecSize(vec)), groundsp.center)
-        objects[i] = &sp
-        fmt.Println(sp.center)
-    }
-    sp1 := sphere{}
-    sp1.center, sp1.r, sp1.color = vector(0, 0, -5), 1, vector(255, 0, 0)
-    objects[howMany+1] = &sp1
+
+    objects := genObjects()
     
     raysPerPix := 2 // 20
     return func(x, y int) { // calculates color of pixel and returns color in a channel
@@ -103,13 +84,7 @@ func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, in
 
             pix = matAdd(pix, shoot(objects, ray, cam, y))
         }
-        pix = matScalar(pix, 1/float64(raysPerPix)) // submitting pixel
-        ixel := pixel{}
-        ixel.x, ixel.y = x, y
-        ixel.r = int(math.Round((pix[0][0])))
-        ixel.g = int(math.Round((pix[1][0])))
-        ixel.b = int(math.Round((pix[2][0])))
-        synk <- &ixel
+        submitPix(x, y, matScalar(pix, 1/float64(raysPerPix)), synk)
         <- sem
     }
 }
@@ -125,6 +100,41 @@ func shoot(objects []*sphere, ray [][]float64, cam *camera, y int) [][]float64 {
     }
     if color == nil {color = backgroundPix(y, cam.height)}
     return color
+}
+
+// just to improve readability in the other function
+func submitPix(x, y int, pix [][]float64, synk chan *pixel) {
+    ixel := pixel{}
+    ixel.x, ixel.y = x, y
+    ixel.r = int(math.Round((pix[0][0])))
+    ixel.g = int(math.Round((pix[1][0])))
+    ixel.b = int(math.Round((pix[2][0])))
+    synk <- &ixel
+}
+
+// function that generates some objects. (temporary function)
+func genObjects() []*sphere {
+    howMany := 5 // generating random objects
+    groundsp := sphere{}
+    groundsp.center, groundsp.r, groundsp.color = vector(0, -1005, -5), 1000, vector(0, 255, 0)
+    objects := make([]*sphere, howMany+2)
+    objects[0] = &groundsp
+    for i := 1; i < howMany+1; i++ {
+        sp := sphere{}
+        sp.r, sp.color = 1, vector(0, 0, 255)
+        // choosing center by randomly distributing spheres in a small area, then displace it up and forward
+        // then find the centers wrt goundsp center and multiply the unit vectors by something so they end up on surface of gsp
+        // finally add back the gsp.center to displace it back
+        vec := matAdd(vector((rand.Float64()-0.5)*30, 0, (rand.Float64()-0.5)*30), vector(0, groundsp.r+sp.r, -40))
+        vec = matSub(vec, groundsp.center)
+        sp.center = matAdd(matScalar(vec, (groundsp.r+sp.r)/vecSize(vec)), groundsp.center)
+        objects[i] = &sp
+        // fmt.Println(sp.center)
+    }
+    sp1 := sphere{}
+    sp1.center, sp1.r, sp1.color = vector(0, 0, -5), 1, vector(255, 0, 0)
+    objects[howMany+1] = &sp1
+    return objects
 }
 
 // returns the color of background. use this if ray dosent hit anything.
