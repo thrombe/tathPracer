@@ -40,6 +40,7 @@ func camInit() *camera {
     return &cam
 }
 
+// main func that calls other funcs and handles concurrency
 func tath() {
     cam := camInit()
     
@@ -64,6 +65,7 @@ func tath() {
     dumpImg(img)
 }
 
+// returns a func that shoots multiple rays per pixel to figure out the color of that pixel
 func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, int) {
     // fwd := vector(0, 0, -1)
     rht := vector(1, 0, 0)
@@ -71,27 +73,27 @@ func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, in
     topLeft := vector(-float64(cam.width)/2, float64(cam.height)/2, -cam.scrDist)
         
     cam.camPos = vector(0, 0, 0)
-    hitSP1 := sphereHitCreate(vector(0, 0, -5), 1) // objects
-    groundSP := sphereHitCreate(vector(0, -1005, 0), 1000)    
+    sp1 := sphere{} // objects
+    sp1.center, sp1.r, sp1.color = vector(0, 0, -5), 1, vector(255, 0, 0)
+    groundsp := sphere{}
+    groundsp.center, groundsp.r, groundsp.color = vector(0, -1005, 0), 1000, vector(0, 255, 0)
     
-    raysPerPix := 20
+    raysPerPix := 2 // 20
     return func(x, y int) { // calculates color of pixel and returns color in a channel
         pix := vector(0, 0, 0)
         for i := 0; i < raysPerPix; i++ {
             randomvec := vector(rand.Float64()-0.5, rand.Float64()-0.5, 0) // we add a random vector to ray to check multiple points within the pixel
             ray := nMatAdd(cam.camPos, topLeft, matScalar(rht, float64(x)), matScalar(up, float64(-y)), randomvec)
-            bright1, t1, did1 := hitSP1(cam.camPos, ray)
-            bright2, t2, did2 := groundSP(cam.camPos, ray)
-            if !did1 && !did2 {
+            
+            b1, t1, d1 := sp1.hit(cam, ray) // find a good way to do this for arbitary no. of objects
+            b2, t2, d2 := groundsp.hit(cam, ray)
+            if !d1 && !d2 {
                 pix = matAdd(pix, backgroundPix(y, cam.height))
-                // set(x, y, round(color[0][0]), round(color[1][0]), round(color[2][0]))
                 continue
             }
-            var bright float64
-            if t1 < t2 && did1 {bright = bright1} else if t2 < t1 && did2 {bright = bright2}
-            // if y == 480/2 {fmt.Println(bright, intersectionPoint, t, x, y)}
-            // set(x, y, round(absVal(255*bright)), 0, 0)
-            pix = matAdd(pix, vector(absVal(255*bright), 0, 0))
+            var color [][]float64
+            if t1 < t2 {color = matScalar(sp1.color, b1)} else {color = matScalar(groundsp.color, b2)}
+            pix = matAdd(pix, color)
         }
         pix = matScalar(pix, 1/float64(raysPerPix)) // submitting pixel
         ixel := pixel{}
@@ -121,20 +123,22 @@ type sphere struct {
 }
 
 // returns a function that tells if the ray hits this sphere or not
-func sphereHitCreate(center [][]float64, r float64) func([][]float64, [][]float64) (float64, float64, bool) {
-    return func(camPos, ray [][]float64) (float64, float64, bool) {
-        oc := matSub(camPos, center)
-        negB := -vecDot(ray, oc)
-        bSq := vecDot(ray, ray)
-        Dby4 := negB*negB - bSq*(vecDot(oc, oc)-r*r)
-        if Dby4 < 0 {return 0, 999999999999, false} // didnt hit
-        t := (negB - math.Sqrt(Dby4))/bSq // no +ve sqrt(D) cuz we want min anyway
-        if t < 0 {return 0, 999999999999, false} // ray hitting behind the camera
-        intersectionPoint := matScalar(ray, t)
-        intersectionNormal := matSub(intersectionPoint, center)
-        intersectionNormal = vecUnit(intersectionNormal)
-        // set(x, y, round(absVal(255*intersectionNormal[0][0])), round(absVal(255*intersectionNormal[1][0])), round(absVal(255*intersectionNormal[2][0])))
-        bright := vecDot(intersectionNormal, vecUnit(vector(-1, -1, -2)))
-        return bright, t, true
-    }
+func (sp *sphere) hit(cam *camera, ray [][]float64) (float64, float64, bool) {
+    oc := matSub(cam.camPos, sp.center)
+    negB := -vecDot(ray, oc)
+    bSq := vecDot(ray, ray)
+    Dby4 := negB*negB - bSq*(vecDot(oc, oc)-sp.r*sp.r)
+    if Dby4 < 0 { // didnt hit
+        return  0, 999999999999, false
+        }
+    t := (negB - math.Sqrt(Dby4))/bSq // no +ve sqrt(D) cuz we want min anyway
+    if t < 0 { // ray hitting behind the camera
+        return 0, 999999999999, false
+        }
+    intersectionPoint := matScalar(ray, t)
+    intersectionNormal := matSub(intersectionPoint, sp.center)
+    intersectionNormal = vecUnit(intersectionNormal)
+    // set(x, y, round(absVal(255*intersectionNormal[0][0])), round(absVal(255*intersectionNormal[1][0])), round(absVal(255*intersectionNormal[2][0])))
+    bright := absVal(vecDot(intersectionNormal, vecUnit(vector(-1, -1, -2))))
+    return bright, t, true
 }
