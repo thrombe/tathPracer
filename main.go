@@ -73,10 +73,26 @@ func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, in
     topLeft := vector(-float64(cam.width)/2, float64(cam.height)/2, -cam.scrDist)
         
     cam.camPos = vector(0, 0, 0)
-    sp1 := sphere{} // objects
-    sp1.center, sp1.r, sp1.color = vector(0, 0, -5), 1, vector(255, 0, 0)
+    howMany := 5
     groundsp := sphere{}
-    groundsp.center, groundsp.r, groundsp.color = vector(0, -1005, 0), 1000, vector(0, 255, 0)
+    groundsp.center, groundsp.r, groundsp.color = vector(0, -1005, -5), 1000, vector(0, 255, 0)
+    objects := make([]*sphere, howMany+2)
+    objects[0] = &groundsp
+    for i := 1; i < howMany+1; i++ {
+        sp := sphere{}
+        sp.r, sp.color = 1, vector(0, 0, 255)
+        // choosing center by randomly distributing spheres in a small area, then displace it up and forward
+        // then find the centers wrt goundsp center and multiply the unit vectors by something so they end up on surface of gsp
+        // finally add back the gsp.center to displace it back
+        vec := matAdd(vector((rand.Float64()-0.5)*30, 0, (rand.Float64()-0.5)*30), vector(0, groundsp.r+sp.r, -40))
+        vec = matSub(vec, groundsp.center)
+        sp.center = matAdd(matScalar(vec, (groundsp.r+sp.r)/vecSize(vec)), groundsp.center)
+        objects[i] = &sp
+        fmt.Println(sp.center)
+    }
+    sp1 := sphere{}
+    sp1.center, sp1.r, sp1.color = vector(0, 0, -5), 1, vector(255, 0, 0)
+    objects[howMany+1] = &sp1
     
     raysPerPix := 2 // 20
     return func(x, y int) { // calculates color of pixel and returns color in a channel
@@ -84,16 +100,8 @@ func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, in
         for i := 0; i < raysPerPix; i++ {
             randomvec := vector(rand.Float64()-0.5, rand.Float64()-0.5, 0) // we add a random vector to ray to check multiple points within the pixel
             ray := nMatAdd(cam.camPos, topLeft, matScalar(rht, float64(x)), matScalar(up, float64(-y)), randomvec)
-            
-            b1, t1, d1 := sp1.hit(cam, ray) // find a good way to do this for arbitary no. of objects
-            b2, t2, d2 := groundsp.hit(cam, ray)
-            if !d1 && !d2 {
-                pix = matAdd(pix, backgroundPix(y, cam.height))
-                continue
-            }
-            var color [][]float64
-            if t1 < t2 {color = matScalar(sp1.color, b1)} else {color = matScalar(groundsp.color, b2)}
-            pix = matAdd(pix, color)
+
+            pix = matAdd(pix, shoot(objects, ray, cam, y))
         }
         pix = matScalar(pix, 1/float64(raysPerPix)) // submitting pixel
         ixel := pixel{}
@@ -106,13 +114,26 @@ func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, in
     }
 }
 
+// receieves objects in a list and determines what the given ray hits (ie closest)
+func shoot(objects []*sphere, ray [][]float64, cam *camera, y int) [][]float64 {
+    tmin := 9999999999999999.0
+    var color [][]float64
+    for _, ob := range objects {
+        bright, t, did := ob.hit(cam, ray)
+        if !did {continue}
+        if t < tmin {color, tmin = matScalar(ob.color, bright), t}
+    }
+    if color == nil {color = backgroundPix(y, cam.height)}
+    return color
+}
+
 // returns the color of background. use this if ray dosent hit anything.
 // we can use any image instead of just simple stuff.
 func backgroundPix(y, height int) [][]float64 {
     t := 1 - float64(y)/float64(height)
-    col1 := vector(229, 240, 255)
-    col2 := vector(148, 191, 255)
-    return matAdd(matScalar(col1, 1-t), matScalar(col2, t))
+    col1 := vector(229, 240, 255) // whitish
+    col2 := vector(148, 191, 255) // skyish blue
+    return matAdd(matScalar(col1, 1-t), matScalar(col2, t)) // interpolate between both according to y value
 }
 
 type sphere struct {
@@ -138,7 +159,6 @@ func (sp *sphere) hit(cam *camera, ray [][]float64) (float64, float64, bool) {
     intersectionPoint := matScalar(ray, t)
     intersectionNormal := matSub(intersectionPoint, sp.center)
     intersectionNormal = vecUnit(intersectionNormal)
-    // set(x, y, round(absVal(255*intersectionNormal[0][0])), round(absVal(255*intersectionNormal[1][0])), round(absVal(255*intersectionNormal[2][0])))
     bright := absVal(vecDot(intersectionNormal, vecUnit(vector(-1, -1, -2))))
     return bright, t, true
 }
