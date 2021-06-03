@@ -5,3 +5,7 @@
   . goroutines fill the colors in pixel{}
   . then image gets rendered if all goes well
     . maybe render and dump image even if it crashes (helps with debugging)
+
+
+remember:
+  . try using any image for backgroundPix()
