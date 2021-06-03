@@ -4,6 +4,7 @@ import (
     "fmt"
     "time"
     "math"
+    "math/rand"
 )
 
 func shhh(vals ...interface{}) {
@@ -18,39 +19,89 @@ func main() {
     tath()
 }
 
+type camera struct {
+    height, width int
+    fov, scrDist float64
+    camPos, camDir [][]float64
+}
+
+type pixel struct {
+    x, y int
+    r, g, b int
+}
+
+func camInit() *camera {
+    cam := camera{}
+    cam.height = 480
+    cam.width = 720
+    cam.fov = math.Pi/3
+    cot := 1/math.Atan(cam.fov/2)
+    cam.scrDist = (float64(cam.width)/2)*cot
+    return &cam
+}
+
 func tath() {
-    height, width := 480, 720
-    img, set := newImg(width, height)
-    fov := math.Pi/3
-    cot := 1/math.Atan(fov/2)
-    scrDist := (float64(width)/2)*cot
+    cam := camInit()
     
+    sem := make(chan struct{}, 8)
+    synk := make(chan *pixel, 16)
+    calcPix := pixGenerator(cam, synk, sem)
+    go func() { // generating more goroutines as needed
+        for y := 0; y < cam.height; y++ {
+            for x := 0; x < cam.width; x++ {
+                sem <- struct{}{}
+                go calcPix(x, y)
+            }
+        }
+    }()
+
+    img, set := newImg(cam.width, cam.height)
+    for i := 0; i < cam.height*cam.width; i++ { // setting pixels of image as they are done
+        pix := <- synk
+        set(pix.x, pix.y, pix.r, pix.g, pix.b)
+    }
+
+    dumpImg(img)
+}
+
+func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, int) {
     // fwd := vector(0, 0, -1)
     rht := vector(1, 0, 0)
     up := vector(0, 1, 0)
-    topLeft := vector(-float64(width)/2, float64(height)/2, -scrDist)
+    topLeft := vector(-float64(cam.width)/2, float64(cam.height)/2, -cam.scrDist)
         
-    camPos := vector(0, 0, 0)
-    hitSP1 := sphereHitCreate(vector(0, 0, -5), 1)
-    groundSP := sphereHitCreate(vector(0, -1005, 0), 1000)
-
-    for y := 0; y < height; y++ {
-        for x := 0; x < width; x++ {
-            ray := nMatAdd(camPos, topLeft, matScalar(rht, float64(x)), matScalar(up, float64(-y)))
-            bright1, t1, did1 := hitSP1(camPos, ray)
-            bright2, t2, did2 := groundSP(camPos, ray)
+    cam.camPos = vector(0, 0, 0)
+    hitSP1 := sphereHitCreate(vector(0, 0, -5), 1) // objects
+    groundSP := sphereHitCreate(vector(0, -1005, 0), 1000)    
+    
+    raysPerPix := 20
+    return func(x, y int) { // calculates color of pixel and returns color in a channel
+        pix := vector(0, 0, 0)
+        for i := 0; i < raysPerPix; i++ {
+            randomvec := vector(rand.Float64()-0.5, rand.Float64()-0.5, 0) // we add a random vector to ray to check multiple points within the pixel
+            ray := nMatAdd(cam.camPos, topLeft, matScalar(rht, float64(x)), matScalar(up, float64(-y)), randomvec)
+            bright1, t1, did1 := hitSP1(cam.camPos, ray)
+            bright2, t2, did2 := groundSP(cam.camPos, ray)
             if !did1 && !did2 {
-                color := backgroundPix(y, height)
-                set(x, y, round(color[0][0]), round(color[1][0]), round(color[2][0]))
+                pix = matAdd(pix, backgroundPix(y, cam.height))
+                // set(x, y, round(color[0][0]), round(color[1][0]), round(color[2][0]))
                 continue
             }
             var bright float64
             if t1 < t2 && did1 {bright = bright1} else if t2 < t1 && did2 {bright = bright2}
             // if y == 480/2 {fmt.Println(bright, intersectionPoint, t, x, y)}
-            set(x, y, round(absVal(255*bright)), 0, 0)
+            // set(x, y, round(absVal(255*bright)), 0, 0)
+            pix = matAdd(pix, vector(absVal(255*bright), 0, 0))
         }
+        pix = matScalar(pix, 1/float64(raysPerPix)) // submitting pixel
+        ixel := pixel{}
+        ixel.x, ixel.y = x, y
+        ixel.r = int(math.Round((pix[0][0])))
+        ixel.g = int(math.Round((pix[1][0])))
+        ixel.b = int(math.Round((pix[2][0])))
+        synk <- &ixel
+        <- sem
     }
-    dumpImg(img)
 }
 
 // returns the color of background. use this if ray dosent hit anything.
@@ -60,6 +111,13 @@ func backgroundPix(y, height int) [][]float64 {
     col1 := vector(229, 240, 255)
     col2 := vector(148, 191, 255)
     return matAdd(matScalar(col1, 1-t), matScalar(col2, t))
+}
+
+type sphere struct {
+    color [][]float64 // color vector
+    r float64
+    center [][]float64
+    material uint8
 }
 
 // returns a function that tells if the ray hits this sphere or not

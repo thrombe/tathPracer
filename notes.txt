@@ -9,3 +9,6 @@
 
 remember:
   . try using any image for backgroundPix()
+
+plan:
+  . 
