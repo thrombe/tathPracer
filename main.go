@@ -81,8 +81,10 @@ func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, in
         for i := 0; i < raysPerPix; i++ {
             randomvec := vector(rand.Float64()-0.5, rand.Float64()-0.5, 0) // we add a random vector to ray to check multiple points within the pixel
             ray := nMatAdd(cam.camPos, topLeft, matScalar(rht, float64(x)), matScalar(up, float64(-y)), randomvec)
+            rayOri := vector(cam.camPos[0][0], cam.camPos[1][0], cam.camPos[2][0])
 
-            pix = matAdd(pix, shoot(objects, ray, cam, y))
+            shot, depth := shoot(objects, ray, rayOri, 0)
+            pix = matAdd(pix, matScalar(shot, 1/float64(depth)))
         }
         submitPix(x, y, matScalar(pix, 1/float64(raysPerPix)), synk)
         <- sem
@@ -90,38 +92,52 @@ func pixGenerator(cam *camera, synk chan *pixel, sem chan struct{}) func(int, in
 }
 
 // receieves objects in a list and determines what the given ray hits (ie closest)
-func shoot(objects []*sphere, ray [][]float64, cam *camera, y int) [][]float64 {
+func shoot(objects []*sphere, ray, rayOri [][]float64, depth int) ([][]float64, int) {
+    depth++
     tmin := 9999999999999999.0
     var color [][]float64
+    var hitt *sphere
     for _, ob := range objects {
-        bright, t, did := ob.hit(cam, ray)
+        bright, t, did := ob.hit(ray, rayOri)
         if !did {continue}
-        if t < tmin {color, tmin = matScalar(ob.color, bright), t}
+        _ = bright
+        // if t < tmin {color, tmin, hitt = matScalar(ob.color, bright), t, ob}
+        if t < tmin {color, tmin, hitt = ob.color, t, ob}
     }
-    if color == nil {color = backgroundPix(y, cam.height)}
-    return color
+    if color == nil {return backgroundPix(ray), depth}
+    if depth >= 60 {return color, depth}
+    // if rand.Float64() > hitt.albedo {return color, depth} // some light gets absorbed (idk if i should return 0 color or sp.color)
+    // if rand.Float64() > hitt.albedo {return vector(0, 0, 0), depth-1}
+    ray, rayOri = hitt.getRay(ray, nMatAdd(rayOri, matScalar(ray, tmin)))
+    shot, dep := shoot(objects, ray, rayOri, depth)
+    return matAdd(color, shot), dep
 }
 
 // just to improve readability in the other function
 func submitPix(x, y int, pix [][]float64, synk chan *pixel) {
     ixel := pixel{}
     ixel.x, ixel.y = x, y
-    ixel.r = int(math.Round((pix[0][0])))
-    ixel.g = int(math.Round((pix[1][0])))
-    ixel.b = int(math.Round((pix[2][0])))
+    // ixel.r = int(math.Round(255*math.Sqrt(pix[0][0]/255))) // /255 and sqrt *255 for gamma correction
+    // ixel.g = int(math.Round(255*math.Sqrt(pix[1][0]/255)))
+    // ixel.b = int(math.Round(255*math.Sqrt(pix[2][0]/255)))
+    ixel.r = int(math.Round(pix[0][0])) // /255 and sqrt *255 for gamma correction
+    ixel.g = int(math.Round(pix[1][0]))
+    ixel.b = int(math.Round(pix[2][0]))
     synk <- &ixel
 }
 
-// function that generates some objects. (temporary function)
+// function that generates some objects. (temporary function) (improves readability in other fn)
 func genObjects() []*sphere {
-    howMany := 5 // generating random objects
+    howMany := 10 // generating random objects
     groundsp := sphere{}
     groundsp.center, groundsp.r, groundsp.color = vector(0, -1005, -5), 1000, vector(0, 255, 0)
+    groundsp.albedo = 0.8
     objects := make([]*sphere, howMany+2)
     objects[0] = &groundsp
-    for i := 1; i < howMany+1; i++ {
+    for i := 1; i < howMany/2+1; i++ { // spheres in front of camera
         sp := sphere{}
         sp.r, sp.color = 1, vector(0, 0, 255)
+        sp.albedo = rand.Float64()
         // choosing center by randomly distributing spheres in a small area, then displace it up and forward
         // then find the centers wrt goundsp center and multiply the unit vectors by something so they end up on surface of gsp
         // finally add back the gsp.center to displace it back
@@ -131,18 +147,31 @@ func genObjects() []*sphere {
         objects[i] = &sp
         // fmt.Println(sp.center)
     }
+    for i := howMany/2+1; i < howMany+1; i++ { // spheres behind camera
+        sp := sphere{}
+        sp.r, sp.color = 1, vector(0, 0, 255)
+        sp.albedo = rand.Float64()
+        vec := matAdd(vector((rand.Float64()-0.5)*30, 0, (rand.Float64()-0.5)*30), vector(0, groundsp.r+sp.r, 40))
+        vec = matSub(vec, groundsp.center)
+        sp.center = matAdd(matScalar(vec, (groundsp.r+sp.r)/vecSize(vec)), groundsp.center)
+        objects[i] = &sp
+    }
     sp1 := sphere{}
     sp1.center, sp1.r, sp1.color = vector(0, 0, -5), 1, vector(255, 0, 0)
+    sp1.albedo = 0.3
     objects[howMany+1] = &sp1
     return objects
 }
 
 // returns the color of background. use this if ray dosent hit anything.
 // we can use any image instead of just simple stuff.
-func backgroundPix(y, height int) [][]float64 {
-    t := 1 - float64(y)/float64(height)
-    col1 := vector(229, 240, 255) // whitish
-    col2 := vector(148, 191, 255) // skyish blue
+func backgroundPix(ray [][]float64) [][]float64 {
+    // t := 1 - float64(y)/float64(height)
+    // col1 := vector(229, 240, 255) // whitish
+    // col2 := vector(148, 191, 255) // skyish blue
+    t := absVal(vecUnit(ray)[1][0])+0.5
+    col1 := vector(255, 255, 255) // whitish
+    col2 := vector(125, 178, 255) // skyish blue
     return matAdd(matScalar(col1, 1-t), matScalar(col2, t)) // interpolate between both according to y value
 }
 
@@ -151,11 +180,12 @@ type sphere struct {
     r float64
     center [][]float64
     material uint8
+    albedo float64 // a degree of how much of the rays hitting the object get absorbed [0, 1)
 }
 
 // returns a function that tells if the ray hits this sphere or not
-func (sp *sphere) hit(cam *camera, ray [][]float64) (float64, float64, bool) {
-    oc := matSub(cam.camPos, sp.center)
+func (sp *sphere) hit(ray, rayOri [][]float64) (float64, float64, bool) {
+    oc := matSub(rayOri, sp.center)
     negB := -vecDot(ray, oc)
     bSq := vecDot(ray, ray)
     Dby4 := negB*negB - bSq*(vecDot(oc, oc)-sp.r*sp.r)
@@ -163,7 +193,7 @@ func (sp *sphere) hit(cam *camera, ray [][]float64) (float64, float64, bool) {
         return  0, 999999999999, false
         }
     t := (negB - math.Sqrt(Dby4))/bSq // no +ve sqrt(D) cuz we want min anyway
-    if t < 0 { // ray hitting behind the camera
+    if t < 0 { // ray hitting behind the camera or really close to object ( t < 0.0000001 for really close thing)
         return 0, 999999999999, false
         }
     intersectionPoint := matScalar(ray, t)
@@ -171,4 +201,26 @@ func (sp *sphere) hit(cam *camera, ray [][]float64) (float64, float64, bool) {
     intersectionNormal = vecUnit(intersectionNormal)
     bright := absVal(vecDot(intersectionNormal, vecUnit(vector(-1, -1, -2))))
     return bright, t, true
+}
+
+// decides what ray to get. ie reflected or refracted etc based on paameters of the sphere
+func (sp *sphere) getRay(ray, point [][]float64) ([][]float64, [][]float64) {
+    return sp.reflection(ray, point)
+    // return diffuse(point)
+}
+
+// returns a point on the unit sphere with center 1 unit from the intersection point in the direction of the normal
+func (sp *sphere) diffuse(point [][]float64) ([][]float64, [][]float64) {
+    unitnormal := vecUnit(matSub(point, sp.center))
+    // point = matAdd(point, matScalar(unitnormal, 0.000000001)) // shadow acne ??
+    return nMatAdd(point, unitnormal, vecUnit(vector(rand.Float64(), rand.Float64(), rand.Float64()))), point
+}
+
+// point is the intersection point
+func (sp *sphere) reflection(ray, point [][]float64) ([][]float64, [][]float64) {
+    normal := matSub(point, sp.center)
+    ray = matScalar(ray, -1)
+    rayOri := point
+    ray = matAdd(ray, matScalar(normal, vecDot(ray, vecUnit(normal))*2))
+    return ray, rayOri
 }
