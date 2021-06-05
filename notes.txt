@@ -9,6 +9,7 @@
 
 remember:
   . try using any image for backgroundPix()
+  . try reflections from inside a big sphere
 
 plan:
   . 
