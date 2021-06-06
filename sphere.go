@@ -13,66 +13,70 @@ type sphere struct {
 }
 
 // returns a function that tells if the ray hits this sphere or not
-func (sp *sphere) hit(ray, rayOri [][]float64) (float64, float64, bool) {
+func (sp *sphere) hit(ray, rayOri [][]float64) (float64, bool) {
     oc := matSub(rayOri, sp.center)
     negB := -vecDot(ray, oc)
     bSq := vecDot(ray, ray)
     Dby4 := negB*negB - bSq*(vecDot(oc, oc)-sp.r*sp.r)
     if Dby4 < 0 { // didnt hit
-        return  0, 999999999999, false
+        return  999999999999, false
         }
     t := (negB - math.Sqrt(Dby4))/bSq // no +ve sqrt(D) cuz we want min anyway
     if t < 0 { // ray hitting behind the camera or really close to object ( t < 0.0000001 for really close thing)
-        return 0, 999999999999, false
+        return 999999999999, false
         }
-    intersectionPoint := matScalar(ray, t)
-    intersectionNormal := matSub(intersectionPoint, sp.center)
-    intersectionNormal = vecUnit(intersectionNormal)
-    bright := absVal(vecDot(intersectionNormal, vecUnit(vector(-1, -1, -2))))
-    return bright, t, true
+    return t, true
 }
 
 // decides what ray to get. ie reflected or refracted etc based on paameters of the sphere
-func (sp *sphere) getRay(ray, point [][]float64) ([][]float64, [][]float64) {
+func (sp *sphere) getRay(ray, rayOri [][]float64, t float64) ([][]float64, [][]float64) {
     if sp.material == 0 {
-        return sp.diffuse(point)
+        rayOri = matAdd(rayOri, matScalar(ray, t))
+        return sp.diffuse(rayOri)
     } else if sp.material == 1 {
-        return sp.reflection(ray, point)
+        rayOri = matAdd(rayOri, matScalar(ray, t))
+        return sp.reflection(ray, rayOri)
     } else if sp.material == 2 {
-        return sp.refraction(ray, point)
+        return sp.refraction(ray, rayOri, t)
     } else {
-        return sp.refraction(ray, point)
+        return sp.refraction(ray, rayOri, t)
     }
 }
 
 // returns a point on the unit sphere with center 1 unit from the intersection point in the direction of the normal
-func (sp *sphere) diffuse(point [][]float64) ([][]float64, [][]float64) {
-    unitnormal := vecUnit(matSub(point, sp.center))
-    // point = matAdd(point, matScalar(unitnormal, 0.000000001)) // shadow acne ??
-    return matAdd(unitnormal, vecUnit(vector(rand.Float64(), rand.Float64(), rand.Float64()))), point
+func (sp *sphere) diffuse(rayOri [][]float64) ([][]float64, [][]float64) {
+    unitnormal := vecUnit(matSub(rayOri, sp.center))
+    return matAdd(unitnormal, vecUnit(vector(rand.Float64(), rand.Float64(), rand.Float64()))), rayOri
 }
 
 // point is the intersection point
-func (sp *sphere) reflection(ray, point [][]float64) ([][]float64, [][]float64) {
-    normal := matSub(point, sp.center)
-    // ray = matScalar(ray, -1)
-    rayOri := point
+func (sp *sphere) reflection(ray, rayOri [][]float64) ([][]float64, [][]float64) {
+    normal := matSub(rayOri, sp.center)
     ray = matAdd(ray, matScalar(normal, -vecDot(ray, vecUnit(normal))*2))
-    // ray = matAdd(ray, matScalar(vector(rand.Float64(), rand.Float64(), rand.Float64()), 3)) // fuzzy reflections? didnt work
+    // ray = matAdd(ray, matScalar(vector(rand.Float64(), rand.Float64(), rand.Float64()),  vecSize(ray)/5)) // fuzzy reflections? didnt work
     return ray, rayOri
 }
 
-func (sp *sphere) refraction(ray, point [][]float64) ([][]float64, [][]float64) {
+// BROKEN
+func (sp *sphere) refraction(ray, rayOri [][]float64, t float64) ([][]float64, [][]float64) {
     muglass := 1.3
     muair := 1.0
-    radiusvec := matSub(point, sp.center)
-    if vecSize(radiusvec) < sp.r {muair, muglass = muglass, muair}
+    rayOri = matAdd(rayOri, matScalar(ray, t*0.999999))
+    radiusvec := matSub(rayOri, sp.center)
+    if vecDot(radiusvec, radiusvec) < sp.r*sp.r {muair, muglass, radiusvec = muglass, muair, matScalar(radiusvec, -1)}
     unitnormal := vecUnit(radiusvec)
-    cross := vecCross(ray, unitnormal)
-    perplen := -vecSize(cross)*muair/muglass // -ve cuz reasons
+    cross := vecCross(matScalar(ray, -1), unitnormal)
+    perplen := vecSize(cross)*muair/muglass
     perpdir := vecUnit(vecCross(cross, unitnormal))
     alonglen := -vecDot(ray, unitnormal)
     ray = matAdd(matScalar(unitnormal, -alonglen), matScalar(perpdir, perplen))
-    // if vecSize(radiusvec) > sp.r {return sp.refraction(ray, matAdd(matScalar(radiusvec, 0.9999), sp.center))} // shoot ray, not call refraction
-    return ray, point // matAdd(matScalar(radiusvec, 1.0001), sp.center)
+    if vecDot(radiusvec, radiusvec) > sp.r*sp.r {return ray, matAdd(matScalar(radiusvec, 0.999999), sp.center)} // shoot ray, not call refraction
+    return ray, matAdd(matScalar(radiusvec, 1.000001), sp.center)
+}
+
+func (sp *sphere) getCol(color [][]float64) [][]float64 {
+    if sp.material == 0 {return sp.color}
+    if sp.material == 1 {return color}
+    if sp.material == 2 {return color}
+    return color
 }

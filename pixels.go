@@ -37,9 +37,13 @@ func engine() {
 func submitPix(x, y int, pix [][]float64, synk chan *pixel) {
     ixel := pixel{}
     ixel.x, ixel.y = x, y
-    ixel.r = int(math.Round(255*math.Sqrt(pix[0][0]/255))) // /255 and sqrt *255 for gamma correction
-    ixel.g = int(math.Round(255*math.Sqrt(pix[1][0]/255)))
-    ixel.b = int(math.Round(255*math.Sqrt(pix[2][0]/255)))
+    rgbchop := chopRange(0, 255) // !!!!!$$!!!$!$!
+    ixel.r = int(rgbchop(math.Round(255*math.Sqrt(pix[0][0]/255)))) // /255 and sqrt *255 for gamma correction
+    ixel.g = int(rgbchop(math.Round(255*math.Sqrt(pix[1][0]/255))))
+    ixel.b = int(rgbchop(math.Round(255*math.Sqrt(pix[2][0]/255))))
+    // ixel.r = int(math.Round(255*math.Sqrt(pix[0][0]/255))) // /255 and sqrt *255 for gamma correction
+    // ixel.g = int(math.Round(255*math.Sqrt(pix[1][0]/255)))
+    // ixel.b = int(math.Round(255*math.Sqrt(pix[2][0]/255)))
     // ixel.r = int(math.Round(pix[0][0]))
     // ixel.g = int(math.Round(pix[1][0]))
     // ixel.b = int(math.Round(pix[2][0]))
