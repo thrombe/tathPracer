@@ -59,19 +59,29 @@ func (sp *sphere) reflection(ray, rayOri [][]float64) ([][]float64, [][]float64)
 
 // BROKEN
 func (sp *sphere) refraction(ray, rayOri [][]float64, t float64) ([][]float64, [][]float64) {
-    muglass := 1.3
+    muglass := 1.5
     muair := 1.0
-    rayOri = matAdd(rayOri, matScalar(ray, t*0.999999))
+    rayOri = matAdd(rayOri, matScalar(ray, t*1.00001))
     radiusvec := matSub(rayOri, sp.center)
-    if vecDot(radiusvec, radiusvec) < sp.r*sp.r {muair, muglass, radiusvec = muglass, muair, matScalar(radiusvec, -1)}
+    // if vecDot(radiusvec, radiusvec) < sp.r*sp.r {muair, muglass, radiusvec = muglass, muair, matScalar(radiusvec, -1)}
     unitnormal := vecUnit(radiusvec)
-    cross := vecCross(matScalar(ray, -1), unitnormal)
-    perplen := vecSize(cross)*muair/muglass
-    perpdir := vecUnit(vecCross(cross, unitnormal))
-    alonglen := -vecDot(ray, unitnormal)
-    ray = matAdd(matScalar(unitnormal, -alonglen), matScalar(perpdir, perplen))
-    if vecDot(radiusvec, radiusvec) > sp.r*sp.r {return ray, matAdd(matScalar(radiusvec, 0.999999), sp.center)} // shoot ray, not call refraction
-    return ray, matAdd(matScalar(radiusvec, 1.000001), sp.center)
+    raypall := matScalar(unitnormal, vecDot(ray, unitnormal))
+    pccrossn := vecCross(matScalar(ray, -1), unitnormal)
+    oriperp := matScalar(vecUnit(vecCross(pccrossn, unitnormal)), vecSize(pccrossn))
+    rayperp := matScalar(oriperp, muair/muglass)
+    ray = matAdd(raypall, rayperp)
+
+    t, hit := sp.hit(ray, rayOri)
+    if !hit {return ray, rayOri}
+    rayOri = matAdd(rayOri, matScalar(ray, t*1.00001))
+    radiusvec = matSub(sp.center, rayOri)
+    unitnormal = vecUnit(radiusvec)
+    raypall = matScalar(unitnormal, vecDot(ray, unitnormal))
+    pccrossn = vecCross(matScalar(ray, -1), unitnormal)
+    oriperp = matScalar(vecUnit(vecCross(pccrossn, unitnormal)), vecSize(pccrossn))
+    rayperp = matScalar(oriperp, muglass/muair)
+    ray = matAdd(raypall, rayperp)
+    return ray, rayOri
 }
 
 func (sp *sphere) getCol(color [][]float64) [][]float64 {
