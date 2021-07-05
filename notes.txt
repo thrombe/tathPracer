@@ -12,4 +12,4 @@ remember:
   . try reflections from inside a big sphere
 
 plan:
-  . 
+  . using a struct for vectors instead of forcing them in matrices gives a speed boost

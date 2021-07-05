@@ -1,4 +1,6 @@
-// this file was originally Vec4d from thrombe/fracGen
+// this file is copied from thrombe/fracGen look there for history
+// this file was originally named Vec4d but was later modified after copying
+
 // should i inline everything???
 
 #[derive(Debug, Clone, Copy)] // is copy good for this???
@@ -29,7 +31,7 @@ impl Vec3d {
 
     #[inline(always)]
     pub fn size(&self) -> f64 {
-        (*self * *self).sqrt()
+        (self.dot(*self)).sqrt()
     }
 
     #[inline(always)]
@@ -42,12 +44,14 @@ impl Vec3d {
         *self * (1.0/self.size())
     }
 
-    pub fn cross(self, other: Vec3d) -> Vec3d {
-        Vec3d {
-            x: self.y*other.z - other.y*self.z,
-            y: self.x*other.z - other.x*self.z,
-            z: self.x*other.y - other.x*self.y,
-        }
+    #[inline(always)]
+    pub fn dot(&self, other: Self) -> f64 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
+    
+    #[inline(always)]
+    pub fn cross(&self, other: Self) -> Self {
+        *self * other
     }
 }
 
@@ -76,12 +80,19 @@ impl Sub for Vec3d {
         }
     }
 }
-impl Mul for Vec3d {
-    type Output = f64;
 
+// cross makes more sense here cuz vec1*vec2 -> Vec3d for 3d vectors
+impl Mul for Vec3d {
+    type Output = Self;
+
+    /// 3d vector multiplication
     #[inline(always)]
-    fn mul(self, other: Self) -> f64 {
-        self.x * other.x + self.y * other.y + self.z * other.z
+    fn mul(self, other: Self) -> Self {
+        Vec3d {
+            x: self.y*other.z - other.y*self.z,
+            y: self.x*other.z - other.x*self.z,
+            z: self.x*other.y - other.x*self.y,
+        }
     }
 }
 
