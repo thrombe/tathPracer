@@ -1,4 +1,4 @@
-1. for parallelisation
+1. for parallelisation in go
   . 15 something go routines in a infinite loop waiting on chan and quitchan
   . a goroutine keeps sending pixel{} into chan
     . pixel has x, y, colors, ...
@@ -6,6 +6,10 @@
   . then image gets rendered if all goes well
     . maybe render and dump image even if it crashes (helps with debugging)
 
+rust stuff:
+  . when going for multi-threading, dont do stuff similar to what is done in fracGen/mandlebrot
+    . some areas of the picture will be like sky, ground, so they take less time. this wastes cores
+    . instead try y % cores or something thats kinda evenly distributed
 
 remember:
   . try using any image for backgroundPix()

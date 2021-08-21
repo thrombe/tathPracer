@@ -24,6 +24,7 @@ impl Vec3d {
         *self*t + other*(1.0-t)
     }
 
+    /// returns self*t + other*(1-t)
     #[inline(always)]
     pub fn lerp(&self, other: Self, t: f64) -> Self {
         *self*t + other*(1.0-t)
@@ -52,6 +53,16 @@ impl Vec3d {
     #[inline(always)]
     pub fn cross(&self, other: Self) -> Self {
         *self * other
+    }
+
+    /// element wise multiplicatin of 2 vectors
+    #[inline(always)]
+    pub fn mul(&self, other: Self) -> Self {
+        Self {
+            x: self.x * other.x,
+            y: self.y * other.y,
+            z: self.z * other.z,
+        }
     }
 }
 
