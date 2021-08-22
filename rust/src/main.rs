@@ -3,10 +3,15 @@
 
 use std::time;
 mod img;
-// mod math;
+mod math;
 mod vec3d;
 mod progress_indicator;
 mod world;
+
+mod ray;
+mod material;
+mod sphere;
+mod scene;
 
 fn main() {
     let now = time::Instant::now();

@@ -14,7 +14,7 @@ impl Ray {
         Ray {pos, dir}
     }
 
-    pub fn at(&mut self, t: f64) {
+    pub fn new_pos(&mut self, t: f64) {
         self.pos = self.pos + self.dir*t;
     }
 }

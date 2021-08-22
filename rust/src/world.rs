@@ -5,25 +5,26 @@ use super::progress_indicator::ProgressIndicator;
 use super::img;
 
 use super::ray::Ray;
-use super::scene::gen_objects;
+use super::scene::gen_world;
 use super::sphere::Sphere;
 
 // use rand::rngs::StdRng;
 // use rand::SeedableRng; // for rng
 use rand::distributions::{Uniform, Distribution};
 
-struct Camera {
-    width: usize,
-    height: usize,
-    pos: Vec3d,
-    fwd: Vec3d,
-    up: Vec3d,
-    right:Vec3d,
-    fov: f64,
-    scr_dist: f64,
-    bouncy_depth: usize,
-    t_correction: f64,
-    far_away: f64,
+pub struct Camera {
+    pub width: usize,
+    pub height: usize,
+    pub pos: Vec3d,
+    pub fwd: Vec3d,
+    pub up: Vec3d,
+    pub right:Vec3d,
+    pub fov: f64,
+    pub scr_dist: f64,
+    pub bouncy_depth: usize,
+    pub samples_per_pixel: usize,
+    pub t_correction: f64,
+    pub far_away: f64,
 
     // focus_dist: f64,
     // aperture: f64,
@@ -32,27 +33,8 @@ struct Camera {
 pub type Rng = rand::prelude::ThreadRng;
 
 pub fn run_world() {
-    let mut world = World {
-        cam: Camera {
-            width: 720,
-            height: 480,
-            fov: std::f64::consts::PI/3.0,
-            pos: Vec3d::new(0.0, 1.5, 0.0),
-            fwd: Vec3d::new(0.0, -0.0, -1.0),
-            up: Vec3d::new(0.0, 1.0, 0.0),
-            right: Vec3d::new(1.0, 0.0, 0.0),
-            scr_dist: 0.0,
-            bouncy_depth: 100,
-            t_correction: 0.0000001,
-            far_away: 1000000000.0,
-        },
-        objects: gen_objects(),
-    };
-    world.cam.scr_dist = {
-        let cot = 1.0/(world.cam.fov/2.0).atan();
-        ((world.cam.width as f64)/2.0)*cot
-    };
-    let samples = 10;
+    let world = gen_world();
+    let samples = world.cam.samples_per_pixel;
     let topleft = world.cam.fwd*world.cam.scr_dist 
                 + world.cam.up*(world.cam.height as f64/2.0) 
                 + world.cam.right*(-1.0)*(world.cam.width as f64/2.0);
@@ -93,9 +75,9 @@ pub fn run_world() {
 }
 
 
-struct World {
-    objects: Vec<Sphere>,
-    cam: Camera,
+pub struct World {
+    pub objects: Vec<Sphere>,
+    pub cam: Camera,
 }
 
 impl World {
@@ -117,9 +99,9 @@ impl World {
         if bouncy_depth <= 0 {return Vec3d::new(0.0, 0.0, 0.0)}
 
         if let (Some(hit_what), t) = self.hit(&ray) {
-            ray.at(t);
+            ray.new_pos(t);
             if let Some(mut ray) = hit_what.scatter(&ray, rng) {
-                return self.get_ray_color(&mut ray, bouncy_depth-1, rng).mul(hit_what.color)
+                return self.get_ray_color(&mut ray, bouncy_depth-1, rng).mul(*hit_what.color())
             }
             // ray absorbed
             return Vec3d::new(0.0, 0.0, 0.0)

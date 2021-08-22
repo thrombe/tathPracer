@@ -49,6 +49,11 @@ impl Vec3d {
     pub fn dot(&self, other: Self) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
+
+    #[inline(always)]
+    pub fn len_sq(&self) -> f64 {
+        self.dot(*self)
+    }
     
     #[inline(always)]
     pub fn cross(&self, other: Self) -> Self {

@@ -56,3 +56,8 @@ pub fn min(a: f64, b: f64) -> f64 {
 pub fn max(a: f64, b: f64) -> f64 {
     if a > b {a} else {b}
 }
+
+#[inline(always)]
+pub fn abs(x: f64) -> f64 {
+    if x > 0.0 {x} else {0.0}
+}

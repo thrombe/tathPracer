@@ -11,7 +11,6 @@ pub struct Sphere {
     pub center: Vec3d,
     pub radius: f64,
     pub material: Material,
-    pub color: Vec3d, // maybe store this in material?
 }
 
 impl Sphere {
@@ -32,10 +31,14 @@ impl Sphere {
     }
 
     pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
-        self.material.scatter(ray, &self.normal(&ray.pos), rng)
+        self.material.scatter(ray, &mut self.normal(&ray.pos), rng)
     }
 
     pub fn normal(&self, point: &Vec3d) -> Vec3d {
         (*point - self.center).unit()
+    }
+
+    pub fn color(&self) -> &Vec3d {
+        self.material.color()
     }
 }
