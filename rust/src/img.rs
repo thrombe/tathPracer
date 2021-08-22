@@ -1,7 +1,7 @@
-// this file is copied from thrombe/fracGen look there for history
 
 use image::{ImageBuffer, RgbImage};
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// an example of how a simple image generation looks like
 pub fn example_img() {
@@ -24,13 +24,15 @@ pub fn new_img(width: u32, height: u32) -> ImageBuffer<image::Rgb<u8>, std::vec:
 
 /// finds what file name is valid
 fn file_name() -> String {
-    let mut i = 0;
-    let mut path: String;
-    loop {
-        path = format!("../images/image{}.png", i);
-        if !Path::new(&path).exists() {return path};
-        i += 1;
+    let now: u64 = SystemTime::now()
+        .duration_since(UNIX_EPOCH).unwrap()
+        .as_secs();
+    let path = format!("../images/{}.png", now);
+    if Path::new(&path).exists() { // should never happen, but i dont wanna loose files
+        println!("file already exists: {}", &path);
+        return file_name()
     }
+    path
 }
 
 /// dumps image with a valid filename

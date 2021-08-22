@@ -5,6 +5,8 @@ use super::progress_indicator::ProgressIndicator;
 use super::img;
 // use super::math;
 
+use rand::rngs::StdRng;
+use rand::SeedableRng; // for rng
 use rand::distributions::{Uniform, Distribution};
 
 struct Camera {
@@ -24,19 +26,75 @@ struct Camera {
     // aperture: f64,
 }
 
+fn gen_objects() -> Vec<Sphere> {
+    let mut objects = Vec::<Sphere>::new();
+    objects.push( // Ground
+        Sphere {
+            center: Vec3d::new(0.0, -1000.0, 0.0),
+            radius: 1000.0,
+            material: Material::Lambertian,
+            color: Vec3d::new(0.5, 0.5, 0.5),
+        }
+    );
+
+    objects.push(
+        Sphere {
+            center: Vec3d::new(0.0, 1.0, -10.0),
+            radius: 1.0,
+            material: Material::Metal,
+            color: Vec3d::new(0.77, 1.0, 0.77),
+        }
+    );
+    objects.push(
+        Sphere {
+            center: Vec3d::new(-2.0, 1.0, -10.0),
+            radius: 1.0,
+            material: Material::Lambertian,
+            color: Vec3d::new(0.65, 1.0, 0.32),
+        }
+    );
+    objects.push(
+        Sphere {
+            center: Vec3d::new(2.0, 1.0, -10.0),
+            radius: 1.0,
+            material: Material::Lambertian,
+            color: Vec3d::new(0.44, 0.21, 1.0),
+        }
+    );
+
+    let mut rng = rand::thread_rng();
+    let random = Uniform::new(-1.0, 1.0);
+    for _ in 0..70 {
+        let z = -(random.sample(&mut rng)+1.0)*10.0;
+        let x = (random.sample(&mut rng))*10.0;
+        objects.push(
+            Sphere {
+                center: (Vec3d::new(x, 0.0, z) - objects[0].center).unit()*(objects[0].radius+0.4) + objects[0].center,
+                radius: 0.4,
+                material: Material::Lambertian,
+                color: Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng)),
+            }
+        );
+    }
+
+    objects
+}
+
+type Rng = rand::prelude::ThreadRng;
+
 pub fn run_world() {
     let mut world = World {
         cam: Camera {
             width: 720,
             height: 480,
             fov: std::f64::consts::PI/3.0,
-            pos: Vec3d::new(0.0, 2.0, 0.0),
-            fwd: Vec3d::new(0.0, -0.4, -1.0),
+            pos: Vec3d::new(0.0, 1.5, 0.0),
+            fwd: Vec3d::new(0.0, -0.0, -1.0),
             up: Vec3d::new(0.0, 1.0, 0.0),
             right: Vec3d::new(1.0, 0.0, 0.0),
             scr_dist: 0.0,
-            bouncy_depth: 50,
-            t_correction: 0.001,
+            bouncy_depth: 100,
+            t_correction: 0.0000001,
             far_away: 1000000000.0,
         },
         objects: gen_objects(),
@@ -56,6 +114,7 @@ pub fn run_world() {
     let rand_width_off = Uniform::new(-half_pix_width, half_pix_width);
     let rand_height_off = Uniform::new(-half_pix_height, half_pix_height);
     let mut rng = rand::thread_rng();
+    // let mut rng = StdRng::from_entropy();
 
     let mut indicator = ProgressIndicator::new(world.cam.height);
     let mut img = img::new_img(world.cam.width as u32, world.cam.height as u32);
@@ -67,7 +126,7 @@ pub fn run_world() {
                     topleft + world.cam.right*(x as f64) + world.cam.up*(-1.0)*(y as f64),
             );
             for s in 0..samples {
-                let wiggle = world.cam.right*rand_height_off.sample(&mut rng) 
+                let wiggle = world.cam.right*rand_width_off.sample(&mut rng) 
                            + world.cam.up*rand_height_off.sample(&mut rng);
                 let mut ray = Ray::new(ray.pos, ray.dir + wiggle);
                 color += world.get_ray_color(&mut ray, world.cam.bouncy_depth, &mut rng);
@@ -82,60 +141,6 @@ pub fn run_world() {
         indicator.indicate(y as usize);
     }
     img::dump_img(img);
-}
-
-fn gen_objects() -> Vec<Sphere> {
-    let mut objects = Vec::<Sphere>::new();
-    objects.push( // Ground
-        Sphere {
-            center: Vec3d::new(0.0, -1000.0, 0.0),
-            radius: 1000.0,
-            material: Material::Lambertian,
-            color: Vec3d::new(0.5, 0.5, 0.5),
-        }
-    );
-
-    objects.push(
-        Sphere {
-            center: Vec3d::new(0.0, 0.0, -10.0),
-            radius: 1.0,
-            material: Material::Metal,
-            color: Vec3d::new(0.77, 1.0, 0.77),
-        }
-    );
-    objects.push(
-        Sphere {
-            center: Vec3d::new(-2.0, 0.0, -10.0),
-            radius: 1.0,
-            material: Material::Lambertian,
-            color: Vec3d::new(0.65, 1.0, 0.32),
-        }
-    );
-    objects.push(
-        Sphere {
-            center: Vec3d::new(2.0, 0.0, -10.0),
-            radius: 1.0,
-            material: Material::Lambertian,
-            color: Vec3d::new(0.44, 0.21, 1.0),
-        }
-    );
-
-    let mut rng = rand::thread_rng();
-    let random = Uniform::new(-1.0, 1.0);
-    for _ in 0..20 {
-        let z = -(random.sample(&mut rng)+1.0)*15.0;
-        let x = (random.sample(&mut rng))*15.0;
-        objects.push(
-            Sphere {
-                center: (Vec3d::new(x, 0.0, z) - objects[0].center)*objects[0].radius,
-                radius: 0.2,
-                material: Material::Lambertian,
-                color: Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng)),
-            }
-        );
-    }
-
-    objects
 }
 
 struct Ray {
@@ -173,7 +178,7 @@ impl World {
         (hit_what, min_t)
     }
 
-    fn get_ray_color(&self, ray: &mut Ray, bouncy_depth: usize, rng: &mut rand::prelude::ThreadRng) -> Vec3d {
+    fn get_ray_color(&self, ray: &mut Ray, bouncy_depth: usize, rng: &mut Rng) -> Vec3d {
         if bouncy_depth <= 0 {return Vec3d::new(0.0, 0.0, 0.0)}
 
         if let (Some(hit_what), t) = self.hit(&ray) {
@@ -198,15 +203,15 @@ enum Material {
 }
 
 impl Material {
-    fn scatter(&self, ray: &Ray, normal: &Vec3d, rng: &mut rand::prelude::ThreadRng) -> Option<Ray> {
+    fn scatter(&self, ray: &Ray, normal: &Vec3d, rng: &mut Rng) -> Option<Ray> {
         let rand = Uniform::new(-1.0, 1.0);
         match self {
             Material::Lambertian => {
                 let mut dir = *normal + Vec3d::new(rand.sample(rng), rand.sample(rng), rand.sample(rng));
-                let tea = 0.00000001;
-                if dir.x < tea && dir.y < tea && dir.z < tea { // ray dir goes 0
-                    dir = *normal;
-                }
+                // let tea = 0.00000001;
+                // if dir.x < tea && dir.y < tea && dir.z < tea { // ray dir goes 0
+                //     dir = *normal;
+                // }
 
                 Some(Ray::new(ray.pos, dir))
             },
@@ -268,11 +273,11 @@ impl Sphere {
         Some(t)
     }
 
-    fn scatter(&self, ray: &Ray, rng: &mut rand::prelude::ThreadRng) -> Option<Ray> {
+    fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
         self.material.scatter(ray, &self.normal(&ray.pos), rng)
     }
 
     fn normal(&self, point: &Vec3d) -> Vec3d {
-        *point - self.center
+        (*point - self.center).unit()
     }
 }
