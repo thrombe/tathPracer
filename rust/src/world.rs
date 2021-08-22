@@ -3,10 +3,13 @@
 use super::vec3d::Vec3d;
 use super::progress_indicator::ProgressIndicator;
 use super::img;
-// use super::math;
 
-use rand::rngs::StdRng;
-use rand::SeedableRng; // for rng
+use super::ray::Ray;
+use super::scene::gen_objects;
+use super::sphere::Sphere;
+
+// use rand::rngs::StdRng;
+// use rand::SeedableRng; // for rng
 use rand::distributions::{Uniform, Distribution};
 
 struct Camera {
@@ -26,61 +29,7 @@ struct Camera {
     // aperture: f64,
 }
 
-fn gen_objects() -> Vec<Sphere> {
-    let mut objects = Vec::<Sphere>::new();
-    objects.push( // Ground
-        Sphere {
-            center: Vec3d::new(0.0, -1000.0, 0.0),
-            radius: 1000.0,
-            material: Material::Lambertian,
-            color: Vec3d::new(0.5, 0.5, 0.5),
-        }
-    );
-
-    objects.push(
-        Sphere {
-            center: Vec3d::new(0.0, 1.0, -10.0),
-            radius: 1.0,
-            material: Material::Metal,
-            color: Vec3d::new(0.77, 1.0, 0.77),
-        }
-    );
-    objects.push(
-        Sphere {
-            center: Vec3d::new(-2.0, 1.0, -10.0),
-            radius: 1.0,
-            material: Material::Lambertian,
-            color: Vec3d::new(0.65, 1.0, 0.32),
-        }
-    );
-    objects.push(
-        Sphere {
-            center: Vec3d::new(2.0, 1.0, -10.0),
-            radius: 1.0,
-            material: Material::Lambertian,
-            color: Vec3d::new(0.44, 0.21, 1.0),
-        }
-    );
-
-    let mut rng = rand::thread_rng();
-    let random = Uniform::new(-1.0, 1.0);
-    for _ in 0..70 {
-        let z = -(random.sample(&mut rng)+1.0)*10.0;
-        let x = (random.sample(&mut rng))*10.0;
-        objects.push(
-            Sphere {
-                center: (Vec3d::new(x, 0.0, z) - objects[0].center).unit()*(objects[0].radius+0.4) + objects[0].center,
-                radius: 0.4,
-                material: Material::Lambertian,
-                color: Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng)),
-            }
-        );
-    }
-
-    objects
-}
-
-type Rng = rand::prelude::ThreadRng;
+pub type Rng = rand::prelude::ThreadRng;
 
 pub fn run_world() {
     let mut world = World {
@@ -125,7 +74,7 @@ pub fn run_world() {
                     world.cam.pos, 
                     topleft + world.cam.right*(x as f64) + world.cam.up*(-1.0)*(y as f64),
             );
-            for s in 0..samples {
+            for _ in 0..samples {
                 let wiggle = world.cam.right*rand_width_off.sample(&mut rng) 
                            + world.cam.up*rand_height_off.sample(&mut rng);
                 let mut ray = Ray::new(ray.pos, ray.dir + wiggle);
@@ -143,20 +92,6 @@ pub fn run_world() {
     img::dump_img(img);
 }
 
-struct Ray {
-    pos: Vec3d,
-    dir: Vec3d,
-}
-
-impl Ray {
-    fn new(pos: Vec3d, dir: Vec3d) -> Self {
-        Ray {pos, dir}
-    }
-
-    fn at(&mut self, t: f64) {
-        self.pos = self.pos + self.dir*t;
-    }
-}
 
 struct World {
     objects: Vec<Sphere>,
@@ -196,88 +131,3 @@ impl World {
     }
 }
 
-enum Material {
-    Metal,
-    Dielectric,
-    Lambertian,
-}
-
-impl Material {
-    fn scatter(&self, ray: &Ray, normal: &Vec3d, rng: &mut Rng) -> Option<Ray> {
-        let rand = Uniform::new(-1.0, 1.0);
-        match self {
-            Material::Lambertian => {
-                let mut dir = *normal + Vec3d::new(rand.sample(rng), rand.sample(rng), rand.sample(rng));
-                // let tea = 0.00000001;
-                // if dir.x < tea && dir.y < tea && dir.z < tea { // ray dir goes 0
-                //     dir = *normal;
-                // }
-
-                Some(Ray::new(ray.pos, dir))
-            },
-            Material::Metal => {
-                let a = ray.dir.unit();
-                let reflected = a - *normal*2.0*a.dot(*normal);
-                if normal.dot(reflected) < 0.0 {return None}
-                Some(Ray::new(ray.pos, reflected))
-            },
-            Material::Dielectric => {
-                None
-            },
-        }
-    }
-}
-
-struct Sphere {
-    center: Vec3d,
-    radius: f64,
-    material: Material,
-    // instead of material being u8, i can try using enum or something for this
-    // or, matrial points to another struct, that receivers an immutable pointer
-    // to sphere, and thus can receive normal and stuff. the material struct just
-    // needs to give next scattered ray and give some color to the ray.
-    color: Vec3d, // maybe store this in material?
-}
-
-pub fn test() {
-    let sp = Sphere {
-        center: Vec3d::new(0.0, 0.0, -5.0),
-        radius: 1.0,
-        material: Material::Lambertian,
-        color: Vec3d::new(1.0, 0.0, 0.0),
-    };
-    let ray = Ray {
-        pos: Vec3d::new(0.0, 0.0, 0.0),
-        dir: Vec3d::new(0.0, 0.0, -1.0),
-    };
-    let val = sp.hit(&ray, 0.0001);
-    println!("{:?}", val);
-}
-
-impl Sphere {
-    /// returns t for the ray if hit, else returns None
-    fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
-        // if hit return Some(t)
-        // otherwise return None
-        let oc = ray.pos-self.center;
-        let neg_b = -ray.dir.dot(oc);
-        let b_sq = ray.dir.dot(ray.dir);
-        let d_by_4 = neg_b*neg_b - b_sq*(oc.dot(oc) - self.radius*self.radius);
-        if d_by_4 < 0.0 { // didnt hit
-            return None
-        }
-        let t = (neg_b - d_by_4.sqrt())/b_sq;
-        if t < t_correction { // ray hitting behind the camera or really close to object ( t < 0.0000001 for really close thing)
-            return None
-        }
-        Some(t)
-    }
-
-    fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
-        self.material.scatter(ray, &self.normal(&ray.pos), rng)
-    }
-
-    fn normal(&self, point: &Vec3d) -> Vec3d {
-        (*point - self.center).unit()
-    }
-}
