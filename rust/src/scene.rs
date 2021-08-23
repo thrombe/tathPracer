@@ -68,6 +68,7 @@ pub fn gen_world() -> World {
                     // color: Vec3d::new(0.44, 0.21, 1.0),
                     color: Vec3d::new(1.0, 1.0, 1.0),
                     refractive_index: 1.5,
+                    fuzz: 0.0,
                 }
             ),
         }
@@ -81,6 +82,7 @@ pub fn gen_world() -> World {
                     // color: Vec3d::new(0.44, 0.21, 1.0),
                     color: Vec3d::new(1.0, 1.0, 1.0),
                     refractive_index: 1.5,
+                    fuzz: 0.0,
                 }
             ),
         }
@@ -129,6 +131,7 @@ pub fn gen_world() -> World {
                         Dielectric {
                             color: Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng)),
                             refractive_index: 1.0 + random.sample(&mut rng),
+                            fuzz: random.sample(&mut rng)*0.0,
                         }
                     ),
                 }

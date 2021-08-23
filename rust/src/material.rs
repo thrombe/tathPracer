@@ -27,6 +27,7 @@ pub struct Metal {
 pub struct Dielectric {
     pub color: Vec3d,
     pub refractive_index: f64,
+    pub fuzz: f64,
 }
 
 impl Material {
@@ -68,6 +69,8 @@ impl Material {
                 };
                 let sin_sq_i = 1.0-cos_i*cos_i;
 
+                let fuzz = Vec3d::new(rand.sample(rng), rand.sample(rng), rand.sample(rng))*obj.fuzz;
+
                 let schlick_approximation = { // something related to reflection off of glass surfaces at extreme angles
                     let mut r0 = (1.0-ri_ratio)/(1.0+ri_ratio);
                     r0 = r0*r0;
@@ -78,11 +81,11 @@ impl Material {
                 if ri_ratio * ri_ratio * sin_sq_i > 1.0 || schlick_approximation { // total internal reflection
                 
                 // if ri_ratio * ri_ratio * sin_sq_i > 1.0 { // total internal reflection
-                        Some(Ray::new(ray.pos, ray_dir_unit - *normal*2.0*ray_dir_unit.dot(*normal)))
+                        Some(Ray::new(ray.pos, ray_dir_unit - *normal*2.0*ray_dir_unit.dot(*normal) + fuzz))
                 } else { // refraction
                     let ray_dir_perp = (ray_dir_unit + *normal * cos_i) * ri_ratio;
                     let ray_dir_parallel = *normal * (-1.0) * math::abs(1.0 - ray_dir_perp.dot(ray_dir_perp)).sqrt();
-                    Some(Ray::new(ray.pos, ray_dir_perp + ray_dir_parallel))
+                    Some(Ray::new(ray.pos, ray_dir_perp + ray_dir_parallel + fuzz))
                 }
             },
         }
