@@ -15,19 +15,71 @@ use rand::distributions::{Uniform, Distribution};
 pub struct Camera {
     pub width: usize,
     pub height: usize,
-    pub pos: Vec3d,
-    pub fwd: Vec3d,
-    pub up: Vec3d,
-    pub right:Vec3d,
-    pub fov: f64,
-    pub scr_dist: f64,
+    pos: Vec3d,
+    fwd: Vec3d,
+    up: Vec3d,
+    right:Vec3d,
+    fov: f64,
     pub bouncy_depth: usize,
     pub samples_per_pixel: usize,
     pub t_correction: f64,
     pub far_away: f64,
+    topleft: Vec3d,
+    scr_dist: f64,
+}
 
-    // focus_dist: f64,
-    // aperture: f64,
+impl Camera {
+
+    pub fn new(width: usize, height: usize, fov: f64, samples_per_pixel: usize) -> Camera {
+        let mut cam = Camera {
+            // inputs
+            width, height, fov, samples_per_pixel,
+            
+            // calculated
+            topleft: Vec3d::zero(), scr_dist: 0.0,
+            
+            // defaults
+            pos: Vec3d::new(0.0, 0.0, 0.0),
+            fwd: Vec3d::new(0.0, 0.0, -1.0),
+            up: Vec3d::new(0.0, 1.0, 0.0),
+            right: Vec3d::new(1.0, 0.0, 0.0),
+            t_correction: 0.0000001,
+            far_away: 1000000000.0,
+            bouncy_depth: 100,
+        };
+        cam.setup();
+        cam
+    }
+
+    pub fn setup(&mut self) {
+        self.scr_dist = {
+                let cot = 1.0/(self.fov/2.0).atan();
+                ((self.width as f64)/2.0)*cot
+            };
+        self.topleft = self.pos 
+                     + self.fwd*self.scr_dist
+                     + self.up*(self.height as f64/2.0) 
+                     + self.right*(-1.0)*(self.width as f64/2.0);
+    }
+
+    pub fn get_ray(&self, x: u32, y: u32) -> Ray {
+        Ray::new(self.pos, self.topleft + self.right*(x as f64) + self.up*(-1.0)*(y as f64))
+    }
+
+    pub fn move_to(&mut self, pos: Vec3d) {
+        self.pos = pos;
+
+        self.setup();
+    }
+
+    /// this works as long as the camera is kind of vertical (i.e. not upside down or something)
+    pub fn face_at(&mut self, dir: Vec3d) {
+        self.fwd = dir.unit();
+        self.right = self.fwd.cross(self.up);
+        self.up = self.right.cross(self.fwd);
+
+        self.setup();
+    }
 }
 
 pub type Rng = rand::prelude::ThreadRng;
@@ -35,9 +87,6 @@ pub type Rng = rand::prelude::ThreadRng;
 pub fn run_world() {
     let world = gen_world();
     let samples = world.cam.samples_per_pixel;
-    let topleft = world.cam.fwd*world.cam.scr_dist 
-                + world.cam.up*(world.cam.height as f64/2.0) 
-                + world.cam.right*(-1.0)*(world.cam.width as f64/2.0);
     
     // rand stuff
     let half_pix_width = 1.0/(world.cam.width as f64*2.0);
@@ -52,14 +101,11 @@ pub fn run_world() {
     for y in 0..world.cam.height as u32 {
         for x in 0..world.cam.width as u32 {
             let mut color = Vec3d::new(0.0, 0.0, 0.0);
-            let ray = Ray::new(
-                    world.cam.pos, 
-                    topleft + world.cam.right*(x as f64) + world.cam.up*(-1.0)*(y as f64),
-            );
             for _ in 0..samples {
+                let mut ray = world.cam.get_ray(x, y);
                 let wiggle = world.cam.right*rand_width_off.sample(&mut rng) 
                            + world.cam.up*rand_height_off.sample(&mut rng);
-                let mut ray = Ray::new(ray.pos, ray.dir + wiggle);
+                ray.dir += wiggle;
                 color += world.get_ray_color(&mut ray, world.cam.bouncy_depth, &mut rng);
             }
             color *= 1.0/(samples as f64);

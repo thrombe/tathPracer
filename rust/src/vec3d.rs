@@ -16,6 +16,10 @@ impl Vec3d {
         Self {x, y, z}
     }
 
+    pub fn zero() -> Self {
+        Self::new(0.0, 0.0, 0.0)
+    }
+
     /// lerp, but chopped at t = 0 and t = 1
     #[inline(always)]
     pub fn lerp_with_chop(&self, other: Self, t: f64) -> Self {

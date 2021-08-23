@@ -1,5 +1,6 @@
 
 use rand::distributions::{Uniform, Distribution};
+use std::f64::consts::PI;
 
 use super::vec3d::Vec3d;
 
@@ -11,26 +12,10 @@ use super::material::{Material, Lambertian, Metal, Dielectric};
 pub fn gen_world() -> World {
 
     let mut world = World {
-        cam: Camera {
-            width: 720,
-            height: 480,
-            fov: std::f64::consts::PI/3.0,
-            pos: Vec3d::new(0.0, 1.5, 0.0),
-            fwd: Vec3d::new(0.0, 0.0, -1.0),
-            up: Vec3d::new(0.0, 1.0, 0.0),
-            right: Vec3d::new(1.0, 0.0, 0.0),
-            scr_dist: 0.0,
-            bouncy_depth: 100,
-            samples_per_pixel: 10,
-            t_correction: 0.0000001,
-            far_away: 1000000000.0,
-        },
+        cam: Camera::new(720, 480, PI/3.0, 10),
         objects: Vec::<Sphere>::new(),
     };
-    world.cam.scr_dist = {
-        let cot = 1.0/(world.cam.fov/2.0).atan();
-        ((world.cam.width as f64)/2.0)*cot
-    };
+    world.cam.move_to(Vec3d::new(0.0, 1.5, 0.0));
 
     world.objects.push( // ground
         Sphere {
