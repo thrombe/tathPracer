@@ -11,11 +11,18 @@ use super::material::{Material, Lambertian, Metal, Dielectric};
 
 pub fn gen_world() -> World {
 
+    let width = 720;
+    let height = 480;
+    let fov = PI/3.0;
+    let samples_per_pixel = 10;
+    let aperture = 0.1;
+    let cam_position = Vec3d::new(0.0, 1.5, 0.0);
+    let look_at = Vec3d::new(0.0, 1.0, -10.0);
+
     let mut world = World {
-        cam: Camera::new(720, 480, PI/3.0, 10),
+        cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
         objects: Vec::<Sphere>::new(),
     };
-    world.cam.move_to(Vec3d::new(0.0, 1.5, 0.0));
 
     world.objects.push( // ground
         Sphere {

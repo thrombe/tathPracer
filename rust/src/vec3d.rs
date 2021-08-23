@@ -61,8 +61,12 @@ impl Vec3d {
     
     #[inline(always)]
     pub fn cross(&self, other: Self) -> Self {
-        *self * other
-    }
+        Vec3d {
+            x: self.y*other.z - other.y*self.z,
+            y: - self.x*other.z + other.x*self.z,
+            z: self.x*other.y - other.x*self.y,
+        }
+}
 
     /// element wise multiplicatin of 2 vectors
     #[inline(always)]
@@ -101,20 +105,20 @@ impl Sub for Vec3d {
     }
 }
 
-// cross makes more sense here cuz vec1*vec2 -> Vec3d for 3d vectors
-impl Mul for Vec3d {
-    type Output = Self;
+// // cross makes more sense here cuz vec1*vec2 -> Vec3d for 3d vectors
+// impl Mul for Vec3d {
+//     type Output = Self;
 
-    /// 3d vector multiplication
-    #[inline(always)]
-    fn mul(self, other: Self) -> Self {
-        Vec3d {
-            x: self.y*other.z - other.y*self.z,
-            y: self.x*other.z - other.x*self.z,
-            z: self.x*other.y - other.x*self.y,
-        }
-    }
-}
+//     /// 3d vector multiplication
+//     #[inline(always)]
+//     fn mul(self, other: Self) -> Self {
+//         Vec3d {
+//             x: self.y*other.z - other.y*self.z,
+//             y: - self.x*other.z + other.x*self.z,
+//             z: self.x*other.y - other.x*self.y,
+//         }
+//     }
+// }
 
 impl Mul<f64> for Vec3d {
     type Output = Self;

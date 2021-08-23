@@ -24,7 +24,7 @@ func camInit() *camera {
     cam.height = 480
     cam.width = 720
     cam.fov = math.Pi/3
-    cot := 1/math.Atan(cam.fov/2)
+    cot := 1/math.Tan(cam.fov/2)
     cam.scrDist = (float64(cam.width)/2)*cot
     return &cam
 }

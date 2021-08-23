@@ -3,8 +3,14 @@ rust stuff:
   . when going for multi-threading, dont do stuff similar to what is done in fracGen/mandlebrot
     . some areas of the picture will be like sky, ground, so they take less time. this wastes cores
     . instead try y % cores or something thats kinda evenly distributed
+    . maybe split work by samples_per_pixel % cores
+      . this needs more ram cuz seperate full size buffer for each core
+        . this isnt too much of a problem as the size is max 8*5k*5k*(1*8 f64) bytes -> 1.5 GB or *= 3/8 for (3*1 u8)
+      . make the world capatible with multiple cores
+        . it already is (i think)
   . multiple samples if material is lambertian ????
   . implement the 3d matrix rotations stuff
+    . maybe the current stuff is plenty for this
 
 remember:
   . try using any image for backgroundPix()
