@@ -36,13 +36,26 @@ pub fn gen_world() -> World {
         }
     );
 
+    // world.objects.push( // sky
+    //     Sphere {
+    //         center: Vec3d::new(0.0, 2.0, 0.0),
+    //         radius: 500.0,
+    //         material: Material::Lit(
+    //             Lit {
+    //                 // color: Vec3d::new(0.9, 0.9, 9.5),
+    //                 color: Vec3d::new(0.0, 0.0, 0.0),
+    //             }
+    //         ),
+    //     }
+    // );
+
     world.objects.push( // mid top
         Sphere {
             center: Vec3d::new(0.0, 3.0, -10.0),
             radius: 1.0,
             material: Material::Lit(
                 Lit {
-                    color: Vec3d::new(3.0, 0.7, 0.8),
+                    color: Vec3d::new(0.80, 1.2, 3.2),
                 }
             ),
         }

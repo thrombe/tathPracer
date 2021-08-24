@@ -7,13 +7,16 @@ rust stuff:
     . this will look cool on random objects (like the velvet coats or whatever)
     . color as a function of direction of normal (like that of sky)
     . color as func of angle with normal?
-  /. lit objects
-    /. colored lighting
   . more materials
+    . textures
+      . custom textured skybox - just another sphere??
     . is sub-surface scatterng doable for me?
-  . custom images for colors of materials
-    . custom skybox
   . fog
+  . more shapes
+    . planes
+    . triangles
+    . rays/lines (will be cool to view rays)
+      . how? these are a bit too thin
   . implement the 3d matrix rotations stuff
     . maybe the current stuff is plenty for this
 

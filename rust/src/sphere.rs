@@ -1,6 +1,7 @@
 
 
 use super::vec3d::Vec3d;
+// use super::math;
 
 use super::material::Material;
 use super::ray::Ray;
@@ -23,7 +24,16 @@ impl Sphere {
         if d_by_4 < 0.0 { // didnt hit
             return None
         }
-        let t = (neg_b - d_by_4.sqrt())/b_sq;
+        let t = { // minimum t when ray originates outside, min +ve t when ray originates inside
+            let sqrt_d_by_4 = d_by_4.sqrt();
+            let m_t = (neg_b - sqrt_d_by_4)/b_sq; // when outside sphere, m_t only is enough
+            let p_t = (neg_b + sqrt_d_by_4)/b_sq; // when inside sphere, p_t is good (i think)
+
+            // if p_t -ve, {m_t is +ve -> good, m_t -ve -> then the t_correction cancels it}
+            // if m_t -ve, we know p_t is +ve -> good
+            // if both +ve -> min(both vals)
+            if p_t < 0.0 {m_t} else if m_t < 0.0 {p_t} else if p_t < m_t {p_t} else {m_t}
+        };
         if t < t_correction { // ray hitting behind the camera or really close to object ( t < 0.0000001 for really close thing)
             return None
         }

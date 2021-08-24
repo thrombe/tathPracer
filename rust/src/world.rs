@@ -53,14 +53,16 @@ impl Camera {
             // calculated
             topleft: Vec3d::zero(), scr_horizontal: Vec3d::zero(), scr_vertical: Vec3d::zero(), scr_dist: 0.0, focus_length: 0.0,
             
-            // defaults
+            // defaults that should not be touched
             fwd: Vec3d::new(0.0, 0.0, -1.0),
             up: Vec3d::new(0.0, 1.0, 0.0),
             right: Vec3d::new(1.0, 0.0, 0.0),
+            rng_distribution: Uniform::new(-1.0, 1.0),
+            
+            // defaults
             t_correction: 0.0000001,
             far_away: 1000000000.0,
             bouncy_depth: 100,
-            rng_distribution: Uniform::new(-1.0, 1.0),
             cores: 7,
         };
         cam.setup();
@@ -216,7 +218,7 @@ impl World {
             if let Material::Lit(obj) = &hit_what.material {
                 return obj.color
             }
-            
+
             ray.new_pos(t);
             if let Some(mut ray) = hit_what.scatter(&ray, rng) {
                 return self.get_ray_color(&mut ray, bouncy_depth-1, rng).mul(*hit_what.color())
