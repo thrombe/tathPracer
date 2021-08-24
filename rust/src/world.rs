@@ -7,6 +7,7 @@ use super::img;
 use super::ray::Ray;
 use super::scene::gen_world;
 use super::sphere::Sphere;
+use super::material::Material;
 
 // use rand::rngs::StdRng;
 // use rand::SeedableRng; // for rng
@@ -188,7 +189,7 @@ pub fn run_world() {
 
 
 pub struct World {
-    pub objects: Vec<Sphere>,
+    pub objects: Vec<Sphere>, // Vec<Box<dyn hittable>>
     pub cam: Camera,
 }
 
@@ -211,6 +212,11 @@ impl World {
         if bouncy_depth <= 0 {return Vec3d::new(0.0, 0.0, 0.0)}
 
         if let (Some(hit_what), t) = self.hit(&ray) {
+            // lit objects
+            if let Material::Lit(obj) = &hit_what.material {
+                return obj.color
+            }
+            
             ray.new_pos(t);
             if let Some(mut ray) = hit_what.scatter(&ray, rng) {
                 return self.get_ray_color(&mut ray, bouncy_depth-1, rng).mul(*hit_what.color())

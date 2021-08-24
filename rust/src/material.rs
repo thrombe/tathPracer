@@ -12,11 +12,11 @@ pub enum Material {
     Lambertian(Lambertian),
     Metal(Metal),
     Dielectric(Dielectric),
+    Lit(Lit), // this can be used as lit if color is greater than 1 and as flat colored stuff if color < 1 (black body if color = 0)
 }
 
 pub struct Lambertian {
     pub color: Vec3d,
-    // pub light: bool,
 }
 
 pub struct Metal {
@@ -28,6 +28,10 @@ pub struct Dielectric {
     pub color: Vec3d,
     pub refractive_index: f64,
     pub fuzz: f64,
+}
+
+pub struct Lit {
+    pub color: Vec3d,
 }
 
 impl Material {
@@ -88,6 +92,9 @@ impl Material {
                     Some(Ray::new(ray.pos, ray_dir_perp + ray_dir_parallel + fuzz))
                 }
             },
+            Material::Lit(_) => {
+                None
+            },
         }
     }
 
@@ -96,6 +103,7 @@ impl Material {
             Material::Lambertian(obj) => &obj.color,
             Material::Metal(obj) => &obj.color,
             Material::Dielectric(obj) => &obj.color,
+            Material::Lit(obj) => &obj.color,
         }
     }
 }

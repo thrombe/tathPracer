@@ -1,21 +1,16 @@
 
 rust stuff:
-  /. when going for multi-threading, dont do stuff similar to what is done in fracGen/mandlebrot
-    /. some areas of the picture will be like sky, ground, so they take less time. this wastes cores
-    /. instead try y % cores or something thats kinda evenly distributed
-    /. maybe split work by samples_per_pixel % cores
-      /. this needs more ram cuz seperate full size buffer for each core
-        /. this isnt too much of a problem as the size is max 8*5k*5k*(1*8 f64) bytes -> 1.5 GB or *= 3/8 for (3*1 u8)
-      /. make the world capatible with multiple cores
-        /. it already is (i think)
+  /. ram probs due to multi-core stuff
+    /. this isnt too much of a problem as the size is max 8*5k*5k*(1*8 f64) bytes -> 1.5 GB or *= 3/8 for (3*1 u8)
   . multiple samples if material is lambertian ????
   . multi-colored materials (all types?)
     . this will look cool on random objects (like the velvet coats or whatever)
     . color as a function of direction of normal (like that of sky)
     . color as func of angle with normal?
-  . lit objects
-    . colored lighting
+  /. lit objects
+    /. colored lighting
   . more materials
+    . is sub-surface scatterng doable for me?
   . custom images for colors of materials
     . custom skybox
   . fog

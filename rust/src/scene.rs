@@ -6,7 +6,7 @@ use super::vec3d::Vec3d;
 
 use super::world::{World, Camera};
 use super::sphere::Sphere;
-use super::material::{Material, Lambertian, Metal, Dielectric};
+use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 
 pub fn gen_world() -> World {
@@ -36,7 +36,18 @@ pub fn gen_world() -> World {
         }
     );
 
-    world.objects.push(
+    world.objects.push( // mid top
+        Sphere {
+            center: Vec3d::new(0.0, 3.0, -10.0),
+            radius: 1.0,
+            material: Material::Lit(
+                Lit {
+                    color: Vec3d::new(3.0, 0.7, 0.8),
+                }
+            ),
+        }
+    );
+    world.objects.push( // mid
         Sphere {
             center: Vec3d::new(0.0, 1.0, -10.0),
             radius: 1.0,
@@ -48,7 +59,7 @@ pub fn gen_world() -> World {
             ),
         }
     );
-    world.objects.push(
+    world.objects.push( // left
         Sphere {
             center: Vec3d::new(-2.0, 1.0, -10.0),
             radius: 1.0,
@@ -59,7 +70,19 @@ pub fn gen_world() -> World {
             ),
         }
     );
-    world.objects.push(
+    world.objects.push( // left top
+        Sphere {
+            center: Vec3d::new(-2.0, 3.0, -10.0),
+            radius: 1.0,
+            material: Material::Metal(
+                Metal {
+                    color: Vec3d::new(0.65, 0.23, 0.72),
+                    fuzz: 0.7,
+                }
+            ),
+        }
+    );
+    world.objects.push( // right
         Sphere {
             center: Vec3d::new(2.0, 1.0, -10.0),
             radius: 1.0,
@@ -97,7 +120,8 @@ pub fn gen_world() -> World {
         let ground_radius = world.objects[0].radius;
         let ground_center = world.objects[0].center;
         let randomiser = random.sample(&mut rng);
-        if randomiser < 0.333 {
+        let threshold = 1.0/4.0; // 4 types of spheres
+        if randomiser < threshold {
             world.objects.push(
                 Sphere {
                     center: (Vec3d::new(x, 0.0, z) - ground_center).unit()*(ground_radius+0.4) + ground_center,
@@ -109,7 +133,7 @@ pub fn gen_world() -> World {
                     ),
                 }
             );    
-        } else if randomiser < 0.666 {
+        } else if randomiser < threshold*2.0 {
             world.objects.push(
                 Sphere {
                     center: (Vec3d::new(x, 0.0, z) - ground_center).unit()*(ground_radius+0.4) + ground_center,
@@ -122,7 +146,7 @@ pub fn gen_world() -> World {
                     ),
                 }
             );    
-        } else {
+        } else if randomiser < threshold*3.0 {
             world.objects.push(
                 Sphere {
                     center: (Vec3d::new(x, 0.0, z) - ground_center).unit()*(ground_radius+0.4) + ground_center,
@@ -135,7 +159,19 @@ pub fn gen_world() -> World {
                         }
                     ),
                 }
-            );    
+            );
+        } else {
+            world.objects.push(
+                Sphere {
+                    center: (Vec3d::new(x, 0.0, z) - ground_center).unit()*(ground_radius+0.4) + ground_center,
+                    radius: 0.4,
+                    material: Material::Lit(
+                        Lit {
+                            color: Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng))*4.0,
+                        }
+                    ),
+                }
+            );
         }
     }
 
