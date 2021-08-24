@@ -14,7 +14,7 @@ pub fn gen_world() -> World {
     let width = 720;
     let height = 480;
     let fov = PI/3.0;
-    let samples_per_pixel = 10;
+    let samples_per_pixel = 100;
     let aperture = 0.1;
     let cam_position = Vec3d::new(0.0, 1.5, 0.0);
     let look_at = Vec3d::new(0.0, 1.0, -10.0);

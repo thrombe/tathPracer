@@ -11,11 +11,13 @@ pub struct ProgressIndicator {
 impl ProgressIndicator {
     /// total is the total amount of work done by the worker
     pub fn new(total: usize) -> ProgressIndicator {
-        ProgressIndicator {
+        let mut pi = ProgressIndicator {
             oneperc: total/100,
             current: 0,
             ended: false,
-        }
+        };
+        if total == 0 {pi.ended = true}
+        pi
     }
 
     /// prog is the current work done by the worker, should end at total

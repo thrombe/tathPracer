@@ -11,6 +11,8 @@ use super::sphere::Sphere;
 // use rand::rngs::StdRng;
 // use rand::SeedableRng; // for rng
 use rand::distributions::{Uniform, Distribution};
+use std::thread; // for multi-threading
+use std::sync::Arc;
 
 pub struct Camera {
     // public for access from world
@@ -37,6 +39,7 @@ pub struct Camera {
     up: Vec3d,
     right:Vec3d,
     rng_distribution: Uniform<f64>,
+    cores: usize,
 }
 
 impl Camera {
@@ -57,6 +60,7 @@ impl Camera {
             far_away: 1000000000.0,
             bouncy_depth: 100,
             rng_distribution: Uniform::new(-1.0, 1.0),
+            cores: 7,
         };
         cam.setup();
         cam
@@ -108,36 +112,77 @@ impl Camera {
 pub type Rng = rand::prelude::ThreadRng;
 
 pub fn run_world() {
-    let world = gen_world();
+    let world = Arc::new(gen_world()); // there should be no arc penalty for use in hot loops as the penalty of rc is only when refrences get created/destroyed. right??
     let samples = world.cam.samples_per_pixel;
+    let cores = world.cam.cores;
     
-    // rand stuff
-    let rand_off = Uniform::new(-0.5, 0.5);
-    let mut rng = rand::thread_rng();
-    // let mut rng = StdRng::from_entropy();
+    let samples_per_thread = samples/cores;
+    let cores_without_extra_work = {
+        let leftover_work = samples-samples_per_thread*cores;
+        cores-leftover_work
+    };
 
-    let mut indicator = ProgressIndicator::new(world.cam.height);
-    let mut img = img::new_img(world.cam.width as u32, world.cam.height as u32);
-    for y in 0..world.cam.height as u32 {
-        for x in 0..world.cam.width as u32 {
-            let mut color = Vec3d::new(0.0, 0.0, 0.0);
-            for _ in 0..samples {
-                let mut ray = world.cam.get_ray(
-                    x as f64 + rand_off.sample(&mut rng), 
-                    y as f64 + rand_off.sample(&mut rng), 
-                    &mut rng,
-                    );
-                color += world.get_ray_color(&mut ray, world.cam.bouncy_depth, &mut rng);
+    let mut worker_vec = vec![];
+    let mut img_buffer: Vec<Vec3d> = Vec::new();
+    for core in 0..cores {
+        let world = Arc::clone(&world);
+        let samples = if core >= cores-cores_without_extra_work {samples_per_thread} else {samples_per_thread+1};
+        let mut indicator = if core == cores-1 {ProgressIndicator::new(world.cam.height)} else {ProgressIndicator::new(0)};
+
+        let mut process = move || -> Vec<Vec3d> { // cant move this outside the loop as rust complains that "world" dies earlier than this closure
+            // rand stuff
+            let rand_off = Uniform::new(-0.5, 0.5);
+            let mut rng = rand::thread_rng();
+                
+            let mut img_buffer: Vec<Vec3d> = Vec::with_capacity(world.cam.width*world.cam.height);
+    
+            for y in 0..world.cam.height as u32 {
+                for x in 0..world.cam.width as u32 {
+                    let mut color = Vec3d::new(0.0, 0.0, 0.0);
+                    for _ in 0..samples {
+                        let mut ray = world.cam.get_ray(
+                            x as f64 + rand_off.sample(&mut rng), 
+                            y as f64 + rand_off.sample(&mut rng), 
+                            &mut rng,
+                            );
+                        color += world.get_ray_color(&mut ray, world.cam.bouncy_depth, &mut rng);
+                    }
+                    img_buffer.push(color);
+                }
+                indicator.indicate(y as usize);
             }
-            color *= 1.0/(samples as f64);
+            img_buffer
+        };    
+
+        if core == cores-1 {
+            img_buffer = process();
+        } else {
+            let worker = thread::spawn(process);
+            worker_vec.push(worker);
+        }
+    }
+    for worker in worker_vec {
+        if let Ok(buffer) = worker.join() {
+            for i in 0..buffer.len() {
+                img_buffer[i] += buffer[i];
+            }
+        }
+    }
+
+    let mut img = img::new_img(world.cam.width as u32, world.cam.height as u32);
+    for y in 0..world.cam.height {
+        for x in 0..world.cam.width {
+            let buffer_index = y*world.cam.width + x;
+            let mut color = img_buffer[buffer_index];
+            color *= 1.0/(world.cam.samples_per_pixel as f64);
             color.x = color.x.sqrt();
-            color.y = color.y.sqrt();
+            color.y = color.y.sqrt(); // cant do this in parallel as sqrt(x+y) != sqrt(x)+sqrt(y)
             color.z = color.z.sqrt();
             color *= 255.0;
-            img::set(&mut img, x, y, color.x, color.y, color.z); // casting from f64 to u8 chops it at ends -> [0, 255]
+            img::set(&mut img, x as u32, y as u32, color.x, color.y, color.z); // casting from f64 to u8 chops it at ends -> [0, 255]
         }
-        indicator.indicate(y as usize);
     }
+
     img::dump_img(img);
 }
 
