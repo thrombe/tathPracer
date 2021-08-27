@@ -10,6 +10,7 @@ use super::world::Rng;
 pub enum Object {
     Sphere(Sphere),
     Plane(Plane),
+    Triangle(Triangle),
 }
 
 impl Object {
@@ -17,6 +18,7 @@ impl Object {
         match self {
             Object::Sphere(obj) => obj.hit(ray, t_correction),
             Object::Plane(obj) => obj.hit(ray, t_correction),
+            Object::Triangle(obj) => obj.hit(ray, t_correction),
         }
     }
 
@@ -24,6 +26,7 @@ impl Object {
         match self {
             Object::Sphere(obj) => obj.scatter(ray, rng),
             Object::Plane(obj) => obj.scatter(ray, rng),
+            Object::Triangle(obj) => obj.scatter(ray, rng),
         }    
     }
 
@@ -31,6 +34,7 @@ impl Object {
         match self {
             Object::Sphere(obj) => obj.normal(ray),
             Object::Plane(obj) => obj.normal(ray),
+            Object::Triangle(obj) => obj.normal(),
         }
     }
 
@@ -38,6 +42,7 @@ impl Object {
         match self {
             Object::Sphere(obj) => obj.color(),
             Object::Plane(obj) => obj.color(),
+            Object::Triangle(obj) => obj.color(),
         }
     }
     
@@ -45,6 +50,7 @@ impl Object {
         match self {
             Object::Sphere(obj) => &obj.material,
             Object::Plane(obj) => &obj.material,
+            Object::Triangle(obj) => &obj.material,
         }
     }
 }
@@ -113,6 +119,52 @@ impl Plane {
 
     pub fn normal(&self, ray: &Ray) -> Vec3d {
         if self.normal.dot(ray.dir) < 0.0 {self.normal.unit()} else {self.normal.unit()*(-1.0)}
+    }
+
+    pub fn color(&self) -> &Vec3d {
+        self.material.color()
+    }
+}
+
+pub struct Triangle {
+    pub vertices: (Vec3d, Vec3d, Vec3d),
+    pub normal: Vec3d,
+    pub material: Material,
+}
+
+impl Triangle { // NOT DONE
+    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
+        let A = self.vertices.0;
+        let B = self.vertices.1;
+        let C = self.vertices.2;
+        let a = ray.pos;
+        let b = ray.dir;
+        // D is determinant of [b, A-B, A-C] (determinant is same after transpose)
+        // let d = A-a;
+        // let d1 = Vec3d::new(b.x, A.x-B.x, A.x-C.x);
+        // let d2 = Vec3d::new(b.y, A.y-B.y, A.y-C.y);
+        // let d3 = Vec3d::new(b.z, A.z-B.z, A.z-C.z);
+        // let D = d1.dot(d2.cross(d3)); // calculating determinant
+        let Ama = A-a;
+        let AmB = A-B;
+        let AmC = A-C;
+        let D = b.dot(AmB.cross(AmC)); // calculating determinant
+        if !(D > t_correction || D < -t_correction) {return None}
+        let t = Ama.dot(AmB.cross(AmC))/D; // finding this using the plane intersection will be faster (quicker bailout for triangles behind cam)
+        if t < t_correction {return None}
+        let w2 = b.dot(Ama.cross(AmC))/D;
+        let w3 = b.dot(AmB.cross(Ama))/D;
+        if !(w2 > 0.0 && w3 > 0.0 && w2 < 1.0 && w3 < 1.0 && w2+w3 < 1.0) {return None}
+        Some(t)
+    }
+
+    pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
+        self.material.scatter(ray, &mut self.normal(), rng)
+    }
+
+    pub fn normal(&self) -> Vec3d {
+        // if self.normal.dot(ray.dir) < 0.0 {self.normal.unit()} else {self.normal.unit()*(-1.0)}
+        self.normal // it has a defined outer direction (vertices clockwise/anti-clockwise)
     }
 
     pub fn color(&self) -> &Vec3d {

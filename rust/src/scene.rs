@@ -5,7 +5,7 @@ use std::f64::consts::PI;
 use super::vec3d::Vec3d;
 
 use super::world::{World, Camera};
-use super::objects::{Object, Sphere, Plane};
+use super::objects::{Object, Sphere, Plane, Triangle};
 use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 
@@ -16,7 +16,7 @@ pub fn gen_world() -> World {
     let fov = PI/3.0;
     let samples_per_pixel = 100;
     let aperture = 0.1;
-    let cam_position = Vec3d::new(0.0, 1.5, 0.0);
+    let cam_position = Vec3d::new(-5.0, 2.50, 0.0);
     let look_at = Vec3d::new(0.0, 1.0, -10.0);
 
     let mut world = World {
@@ -29,7 +29,9 @@ pub fn gen_world() -> World {
             point: Vec3d::new(0.0, 0.0, 0.0),
             normal: Vec3d::new(0.0, 1.0, 0.0),
             material: Material::Lambertian(Lambertian {
+            // material: Material::Metal(Metal {
                 color:Vec3d::new(0.45, 0.3, 0.45),
+                // fuzz: 0.3,
             }),
         })
     );
@@ -67,6 +69,20 @@ pub fn gen_world() -> World {
     //         })
     //     })
     // );
+
+    world.objects.push( // triangle test
+        Object::Triangle(Triangle {
+            vertices: (
+                Vec3d::new(-2.0, 1.0, -10.0),
+                Vec3d::new(2.0, 1.0, -10.0),
+                Vec3d::new(0.0, 3.0, -10.0),
+            ),
+            normal: Vec3d::new(0.0, 0.0, -1.0),
+            material: Material::Lambertian(Lambertian {
+                color: Vec3d::new(0.80, 0.8, 0.5),
+            }),
+        })
+    );
 
     world.objects.push( // mid top
         Object::Sphere(Sphere {
@@ -121,7 +137,7 @@ pub fn gen_world() -> World {
     world.objects.push( // trying hollow glass sphere
         Object::Sphere(Sphere {
             center: Vec3d::new(2.0, 1.0, -10.0),
-            radius: -0.5,
+            radius: -0.3,
             material: Material::Dielectric(Dielectric {
                 // color: Vec3d::new(0.44, 0.21, 1.0),
                 color: Vec3d::new(1.0, 1.0, 1.0),
@@ -133,7 +149,7 @@ pub fn gen_world() -> World {
 
     let mut rng = rand::thread_rng();
     let random = Uniform::new(0.0, 1.0);
-    for _ in 0..70 {
+    for _ in 0..90 {
         let z = (random.sample(&mut rng)-0.5)*20.0 - 10.0;
         let x = (random.sample(&mut rng)-0.5)*20.0;
         let radius = 0.4;
