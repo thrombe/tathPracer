@@ -108,8 +108,11 @@ pub struct Plane {
 
 impl Plane {
     pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
-        let normal = self.normal(ray);
-        let t = (self.point-ray.pos).dot(normal)/ray.dir.dot(normal);
+        // (a+bt-p).n = 0 -> t = ((p-a).n)/(b.n) : ray is a+bt, p is a point on plane, n is normal to plane
+
+        // let normal = self.normal(ray);
+        let normal = self.normal;
+        let t = (self.point-ray.pos).dot(normal)/ray.dir.dot(normal); // normal or -ve normal dosent matter here cuz normal is in both num and denom
         if t > t_correction {Some(t)} else {None}
     }
 
@@ -132,29 +135,38 @@ pub struct Triangle {
     pub material: Material,
 }
 
-impl Triangle { // NOT DONE
+impl Triangle {
     pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
+        // M-1
+        // let OAB (clockwise) be a triangle if A.cross(P).dot(N) > 0 and B.cross(P).dot(N) < 0 -> P is inside
+        // N is normal = A.cross(B), and P is the required point
+
+        // M-2
+        // let ABC be triangle, a+bt be ray, a+bt=A(1-w2-w3)+Bw2+Cw3 (barycentric coords)
+        // A-a=[b, A-B, A-C]*[[t], [w2], [w3]] then apply crammers rule
+        // (remember b, A-B .. are vectors, so that is a 3x3 matrix)
+        // calculate D, D1, D2, D3, if D != 0(close to 0 cuz float)(if D<0, triangle is backwards), t = D1/D ....
+        // D can be calculated by a.dot(b.cross(c))
+
+        // finding t by plane intersection
+        let t = (self.vertices.0-ray.pos).dot(self.normal)/ray.dir.dot(self.normal);
+        if t < t_correction {return None}
+
         let A = self.vertices.0;
         let B = self.vertices.1;
         let C = self.vertices.2;
         let a = ray.pos;
         let b = ray.dir;
-        // D is determinant of [b, A-B, A-C] (determinant is same after transpose)
-        // let d = A-a;
-        // let d1 = Vec3d::new(b.x, A.x-B.x, A.x-C.x);
-        // let d2 = Vec3d::new(b.y, A.y-B.y, A.y-C.y);
-        // let d3 = Vec3d::new(b.z, A.z-B.z, A.z-C.z);
-        // let D = d1.dot(d2.cross(d3)); // calculating determinant
         let Ama = A-a;
         let AmB = A-B;
         let AmC = A-C;
-        let D = b.dot(AmB.cross(AmC)); // calculating determinant
+        let D = b.dot(AmB.cross(AmC));
         if !(D > t_correction || D < -t_correction) {return None}
-        let t = Ama.dot(AmB.cross(AmC))/D; // finding this using the plane intersection will be faster (quicker bailout for triangles behind cam)
-        if t < t_correction {return None}
-        let w2 = b.dot(Ama.cross(AmC))/D;
-        let w3 = b.dot(AmB.cross(Ama))/D;
-        if !(w2 > 0.0 && w3 > 0.0 && w2 < 1.0 && w3 < 1.0 && w2+w3 < 1.0) {return None}
+        // let t = Ama.dot(AmB.cross(AmC))/D; // D1/D
+        // if t < t_correction {return None}
+        let w2 = b.dot(Ama.cross(AmC))/D; // D2/D
+        let w3 = b.dot(AmB.cross(Ama))/D; // D3/D
+        if !(w2 > 0.0 && w3 > 0.0 && w2+w3 < 1.0) {return None}
         Some(t)
     }
 
@@ -163,7 +175,6 @@ impl Triangle { // NOT DONE
     }
 
     pub fn normal(&self) -> Vec3d {
-        // if self.normal.dot(ray.dir) < 0.0 {self.normal.unit()} else {self.normal.unit()*(-1.0)}
         self.normal // it has a defined outer direction (vertices clockwise/anti-clockwise)
     }
 
