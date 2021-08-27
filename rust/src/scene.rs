@@ -5,7 +5,7 @@ use std::f64::consts::PI;
 use super::vec3d::Vec3d;
 
 use super::world::{World, Camera};
-use super::sphere::{Object, Sphere, Plane};
+use super::objects::{Object, Sphere, Plane};
 use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 

@@ -6,7 +6,7 @@ use super::img;
 
 use super::ray::Ray;
 use super::scene::gen_world;
-use super::sphere::{Object};
+use super::objects::{Object};
 use super::material::Material;
 
 // use rand::rngs::StdRng;
