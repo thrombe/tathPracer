@@ -79,8 +79,7 @@ impl Material {
                     let mut r0 = (1.0-ri_ratio)/(1.0+ri_ratio);
                     r0 = r0*r0;
                     let reflectance = r0 + (1.0-r0)*((1.0-cos_i).powf(5.0));
-                    reflectance > (rand.sample(rng)+1.0)/1.0 // what should be the range for this random var???
-                    // reflectance < (rand.sample(rng)+1.0)/1.0 // what should be the range for this random var???
+                    reflectance > (rand.sample(rng)+1.0)/1.0
                 };
                 if ri_ratio * ri_ratio * sin_sq_i > 1.0 || schlick_approximation { // total internal reflection
                 

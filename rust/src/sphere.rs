@@ -7,6 +7,47 @@ use super::material::Material;
 use super::ray::Ray;
 use super::world::Rng;
 
+pub enum Object {
+    Sphere(Sphere),
+    Plane(Plane),
+}
+
+impl Object {
+    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
+        match self {
+            Object::Sphere(obj) => obj.hit(ray, t_correction),
+            Object::Plane(obj) => obj.hit(ray, t_correction),
+        }
+    }
+
+    pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
+        match self {
+            Object::Sphere(obj) => obj.scatter(ray, rng),
+            Object::Plane(obj) => obj.scatter(ray, rng),
+        }    
+    }
+
+    pub fn normal(&self, point: &Vec3d) -> Vec3d {
+        match self {
+            Object::Sphere(obj) => obj.normal(point),
+            Object::Plane(obj) => obj.normal(),
+        }
+    }
+
+    pub fn color(&self) -> &Vec3d {
+        match self {
+            Object::Sphere(obj) => obj.color(),
+            Object::Plane(obj) => obj.color(),
+        }
+    }
+    
+    pub fn material(&self) -> &Material {
+        match self {
+            Object::Sphere(obj) => &obj.material,
+            Object::Plane(obj) => &obj.material,
+        }
+    }
+}
 
 pub struct Sphere {
     pub center: Vec3d,
@@ -46,6 +87,31 @@ impl Sphere {
 
     pub fn normal(&self, point: &Vec3d) -> Vec3d {
         (*point - self.center).unit()
+    }
+
+    pub fn color(&self) -> &Vec3d {
+        self.material.color()
+    }
+}
+
+pub struct Plane {
+    pub normal: Vec3d,
+    pub point: Vec3d,
+    pub material: Material,
+}
+
+impl Plane {
+    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
+        let t = (self.point-ray.pos).dot(self.normal)/ray.dir.dot(self.normal);
+        if t > t_correction {Some(t)} else {None}
+    }
+
+    pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
+        self.material.scatter(ray, &mut self.normal(), rng)
+    }
+
+    pub fn normal(&self) -> Vec3d {
+        self.normal.unit()
     }
 
     pub fn color(&self) -> &Vec3d {

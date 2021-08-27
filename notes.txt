@@ -1,25 +1,74 @@
 
-rust stuff:
+todo/ideas:
   /. ram probs due to multi-core stuff
     /. this isnt too much of a problem as the size is max 8*5k*5k*(1*8 f64) bytes -> 1.5 GB or *= 3/8 for (3*1 u8)
+  . use enum for multiple types of objects?
   . multiple samples if material is lambertian ????
   . multi-colored materials (all types?)
     . this will look cool on random objects (like the velvet coats or whatever)
     . color as a function of direction of normal (like that of sky)
     . color as func of angle with normal?
+  . try colors > 1 on all materials
+  . better fresnel or whatever
+    . instead of randomising reflection and refraction, a part of them should bounce and a part should refract
   . more materials
     . textures
       . custom textured skybox - just another sphere??
+    . mixture of metal and lembertian and etc
+      . some probability that it behaves in a way
+      . can i just have 1 material then?
+        . with different settings
     . is sub-surface scatterng doable for me?
   . fog
+    . get 2 limits for t (where there is fog)
+    . some probability that it passes/interacts depending on t
+    . if interacts, pick some t in the range
+    . let it bounce in random direction
+  . a portal
+    . maybe any shape + coupled objects
+      . different ways the ray comes out
+        . fuzz
+        . direction
+        . color
+    . how do i make the objects peleport through these?
+  . bounding boxes using 2 vectors
   . more shapes
     . planes
+      . (a+bt-p).n = 0 -> t = ((p-a).n)/(b.n) : ray is a+bt, p is a point on plane, n is normal to plane
     . triangles
+      . first find point on plane
+      . then the area method to see if it lies inside
+        . too much computation?
+      . or find barycentric coords and check
+        . formula on wiki
+      . or check what side of the lines the point lies on (like does it lies on the same side as the third vertex)
+      . or check for methods from other implementations
+      . let OAB (clockwise) be a triangle if A.cross(P).dot(N) > 0 and B.cross(P).dot(N) < 0 -> P is inside
+        N is normal = A.cross(B), and P is the required point
+      . EVEN BETTER
+        let ABC be triangle, a+bt be ray, a+bt=A(1-w2-w3)+Bw2+Cw3 (barycentric coords)
+        A-a=[b, A-B, A-C]*[[t], [w2], [w3]] then apply crammers rule
+        (remember b, A-B .. are vectors, so that is a 3x3 matrix)
+        calculate D, D1, D2, D3, if D != 0(close to 0 cuz float)(if D<0, triangle is backwards), t = D1/D ....
+        . D can be calculated by a.dot(b.cross(c))
+        . maybe intersecting with plane first(early bailout) and t > 0 could be faster? idk
     . rays/lines (will be cool to view rays)
       . how? these are a bit too thin
+    . lens
+      . this is just the intersection of 2 spheres, so its only where t for both exists for a ray
+        but some more constraints are needed, like maybe it should hit outer of sp1 and then inner of sp2
+      . m_t_s1 < p_t_s2 where s1 is the sphere further away from ray.pos
+        how? -> whenever ray intersects both, it will (mostly) have 4 sols
+        so just pick the middle 2  (m_t is ((-b-root(D))/4a) and p_t is -b+rootD...)
+    . parabolic/spherical surfaces
   . implement the 3d matrix rotations stuff
     . maybe the current stuff is plenty for this
+  . what would happen if i just use 4d vectors and 4d objects (consider a teseract)
+    rotate the needed vectors with rotation matrices and and try to render it with similar tech as 3d
+    . 3d images? (assigning colors to 3d pixels) can i do anything with this?
+    . 2d images?
 
 remember:
   . try reflections from inside a big sphere
+    . its too dark, no reflections are visible
 

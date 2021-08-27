@@ -6,7 +6,7 @@ use super::img;
 
 use super::ray::Ray;
 use super::scene::gen_world;
-use super::sphere::Sphere;
+use super::sphere::{Object};
 use super::material::Material;
 
 // use rand::rngs::StdRng;
@@ -191,12 +191,12 @@ pub fn run_world() {
 
 
 pub struct World {
-    pub objects: Vec<Sphere>, // Vec<Box<dyn hittable>>
+    pub objects: Vec<Object>, // Vec<Box<dyn hittable>> or enum ?
     pub cam: Camera,
 }
 
 impl World {
-    fn hit(&self, ray: &Ray) -> (Option<&Sphere>, f64) {
+    fn hit(&self, ray: &Ray) -> (Option<&Object>, f64) {
         let mut min_t = self.cam.far_away;
         let mut hit_what = None;
         for object in &self.objects {
@@ -215,7 +215,7 @@ impl World {
 
         if let (Some(hit_what), t) = self.hit(&ray) {
             // lit objects
-            if let Material::Lit(obj) = &hit_what.material {
+            if let Material::Lit(obj) = hit_what.material() {
                 return obj.color
             }
 
