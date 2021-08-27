@@ -27,10 +27,10 @@ impl Object {
         }    
     }
 
-    pub fn normal(&self, point: &Vec3d) -> Vec3d {
+    pub fn normal(&self, ray: &Ray) -> Vec3d {
         match self {
-            Object::Sphere(obj) => obj.normal(point),
-            Object::Plane(obj) => obj.normal(),
+            Object::Sphere(obj) => obj.normal(ray),
+            Object::Plane(obj) => obj.normal(ray),
         }
     }
 
@@ -82,11 +82,11 @@ impl Sphere {
     }
 
     pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
-        self.material.scatter(ray, &mut self.normal(&ray.pos), rng)
+        self.material.scatter(ray, &mut self.normal(ray), rng)
     }
 
-    pub fn normal(&self, point: &Vec3d) -> Vec3d {
-        (*point - self.center).unit()
+    pub fn normal(&self, ray: &Ray) -> Vec3d {
+        (ray.pos - self.center).unit()
     }
 
     pub fn color(&self) -> &Vec3d {
@@ -102,16 +102,17 @@ pub struct Plane {
 
 impl Plane {
     pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
-        let t = (self.point-ray.pos).dot(self.normal)/ray.dir.dot(self.normal);
+        let normal = self.normal(ray);
+        let t = (self.point-ray.pos).dot(normal)/ray.dir.dot(normal);
         if t > t_correction {Some(t)} else {None}
     }
 
     pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
-        self.material.scatter(ray, &mut self.normal(), rng)
+        self.material.scatter(ray, &mut self.normal(ray), rng)
     }
 
-    pub fn normal(&self) -> Vec3d {
-        self.normal.unit()
+    pub fn normal(&self, ray: &Ray) -> Vec3d {
+        if self.normal.dot(ray.dir) < 0.0 {self.normal.unit()} else {self.normal.unit()*(-1.0)}
     }
 
     pub fn color(&self) -> &Vec3d {
