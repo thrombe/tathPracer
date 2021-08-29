@@ -31,7 +31,7 @@ pub fn gen_world() -> World {
             material: Material::Lambertian(Lambertian {
             // material: Material::Metal(Metal {
                 color:Vec3d::new(0.45, 0.3, 0.45),
-                // fuzz: 0.3,
+                // fuzz: 0.01,
             }),
         })
     );
@@ -69,20 +69,6 @@ pub fn gen_world() -> World {
     //         })
     //     })
     // );
-
-    world.objects.push( // triangle test
-        Object::Triangle(Triangle {
-            vertices: (
-                Vec3d::new(-2.0, 1.0, -10.0),
-                Vec3d::new(2.0, 1.0, -10.0),
-                Vec3d::new(0.0, 3.0, -10.0),
-            ),
-            normal: Vec3d::new(0.0, 0.0, -1.0),
-            material: Material::Lambertian(Lambertian {
-                color: Vec3d::new(0.80, 0.8, 0.5),
-            }),
-        })
-    );
 
     world.objects.push( // mid top
         Object::Sphere(Sphere {

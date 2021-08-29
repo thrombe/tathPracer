@@ -4,7 +4,7 @@ use super::vec3d::Vec3d;
 use super::progress_indicator::ProgressIndicator;
 use super::img;
 
-use super::ray::Ray;
+use super::ray::{Ray, RayHitfo};
 use super::scene::gen_world;
 use super::objects::{Object};
 use super::material::Material;
@@ -196,32 +196,32 @@ pub struct World {
 }
 
 impl World {
-    fn hit(&self, ray: &Ray) -> (Option<&Object>, f64) {
+    #[inline(always)]
+    fn hit(&self, ray: &Ray) -> Option<RayHitfo> {
         let mut min_t = self.cam.far_away;
         let mut hit_what = None;
         for object in &self.objects {
-            if let Some(t) = object.hit(&ray, self.cam.t_correction) {
-                if min_t > t {
-                    min_t = t;
-                    hit_what = Some(&*object);
+            if let Some(hitfo) = object.hit(&ray, self.cam.t_correction) {
+                if min_t > hitfo.t {
+                    min_t = hitfo.t;
+                    hit_what = Some(hitfo);
                 }
             }
         }
-        (hit_what, min_t)
+        hit_what
     }
 
     fn get_ray_color(&self, ray: &mut Ray, bouncy_depth: usize, rng: &mut Rng) -> Vec3d {
         if bouncy_depth <= 0 {return Vec3d::new(0.0, 0.0, 0.0)}
 
-        if let (Some(hit_what), t) = self.hit(&ray) {
+        if let Some(hitfo) = self.hit(&ray) {
             // lit objects
-            if let Material::Lit(obj) = hit_what.material() {
+            if let Material::Lit(obj) = hitfo.material {
                 return obj.color
             }
 
-            ray.new_pos(t);
-            if let Some(mut ray) = hit_what.scatter(&ray, rng) {
-                return self.get_ray_color(&mut ray, bouncy_depth-1, rng).mul(*hit_what.color())
+            if let Some(mut ray) = hitfo.scatter(rng) {
+                return self.get_ray_color(&mut ray, bouncy_depth-1, rng).mul(*hitfo.material.color())
             }
             // ray absorbed
             return Vec3d::new(0.0, 0.0, 0.0)

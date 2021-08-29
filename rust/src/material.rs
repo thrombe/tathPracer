@@ -7,7 +7,7 @@ use super::ray::Ray;
 use super::world::Rng;
 use super::math;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Material {
     Lambertian(Lambertian),
     Metal(Metal),
@@ -15,31 +15,31 @@ pub enum Material {
     Lit(Lit), // this can be used as lit if color is greater than 1 and as flat colored stuff if color < 1 (black body if color = 0)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lambertian {
     pub color: Vec3d,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Metal {
     pub color: Vec3d,
     pub fuzz: f64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Dielectric {
     pub color: Vec3d,
     pub refractive_index: f64,
     pub fuzz: f64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lit {
     pub color: Vec3d,
 }
 
 impl Material {
-    pub fn scatter(&self, ray: &Ray, normal: &mut Vec3d, rng: &mut Rng) -> Option<Ray> {
+    pub fn scatter(&self, ray: &Ray, normal: &Vec3d, rng: &mut Rng) -> Option<Ray> {
         let rand = Uniform::new(-1.0, 1.0);
         match self {
             Material::Lambertian(_) => {
@@ -54,20 +54,21 @@ impl Material {
             Material::Metal(obj) => {
                 let a = ray.dir.unit();
                 let mut reflected = a - *normal*2.0*a.dot(*normal);
-                if normal.dot(reflected) < 0.0 {return None}
+                if reflected.dot(*normal) < 0.0 {return None}
                 reflected += Vec3d::new(rand.sample(rng), rand.sample(rng), rand.sample(rng))*obj.fuzz;
                 Some(Ray::new(ray.pos, reflected))
             },
             Material::Dielectric(obj) => {
+                let mut normal = normal.clone();
                 let ray_dir_unit = ray.dir.unit();
-                let mut ray_dir_dot_normal = ray_dir_unit.dot(*normal);
+                let mut ray_dir_dot_normal = ray_dir_unit.dot(normal);
 
                 let ri_ratio = { // ri_matrial2/ri_material1
                     // ray dot normal < 0 means that ray is hitting on the outer surface
                     if ray_dir_dot_normal < 0.0 {1.0/obj.refractive_index}
                     else {
                         ray_dir_dot_normal *= -1.0;
-                        *normal *= -1.0;
+                        normal *= -1.0;
                         obj.refractive_index
                     }
 
@@ -88,10 +89,10 @@ impl Material {
                 if ri_ratio * ri_ratio * sin_sq_i > 1.0 || schlick_approximation { // total internal reflection
                 
                 // if ri_ratio * ri_ratio * sin_sq_i > 1.0 { // total internal reflection
-                        Some(Ray::new(ray.pos, ray_dir_unit - *normal*2.0*ray_dir_unit.dot(*normal) + fuzz))
+                        Some(Ray::new(ray.pos, ray_dir_unit - normal*2.0*ray_dir_unit.dot(normal) + fuzz))
                 } else { // refraction
-                    let ray_dir_perp = (ray_dir_unit + *normal * cos_i) * ri_ratio;
-                    let ray_dir_parallel = *normal * (-1.0) * math::abs(1.0 - ray_dir_perp.dot(ray_dir_perp)).sqrt();
+                    let ray_dir_perp = (ray_dir_unit + normal * cos_i) * ri_ratio;
+                    let ray_dir_parallel = normal * (-1.0) * math::abs(1.0 - ray_dir_perp.dot(ray_dir_perp)).sqrt();
                     Some(Ray::new(ray.pos, ray_dir_perp + ray_dir_parallel + fuzz))
                 }
             },
@@ -101,6 +102,7 @@ impl Material {
         }
     }
 
+    #[inline(always)]
     pub fn color(&self) -> &Vec3d {
         match self {
             Material::Lambertian(obj) => &obj.color,

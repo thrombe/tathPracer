@@ -1,56 +1,24 @@
 
+use std::sync::Arc;
 
 use super::vec3d::Vec3d;
 // use super::math;
 
 use super::material::Material;
-use super::ray::Ray;
+use super::ray::{Ray, RayHitfo};
 use super::world::Rng;
+// use super::octree::Octree;
 
 pub enum Object {
     Sphere(Sphere),
     Plane(Plane),
-    Triangle(Triangle),
 }
 
 impl Object {
-    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
+    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<RayHitfo> {
         match self {
             Object::Sphere(obj) => obj.hit(ray, t_correction),
             Object::Plane(obj) => obj.hit(ray, t_correction),
-            Object::Triangle(obj) => obj.hit(ray, t_correction),
-        }
-    }
-
-    pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
-        match self {
-            Object::Sphere(obj) => obj.scatter(ray, rng),
-            Object::Plane(obj) => obj.scatter(ray, rng),
-            Object::Triangle(obj) => obj.scatter(ray, rng),
-        }    
-    }
-
-    pub fn normal(&self, ray: &Ray) -> Vec3d {
-        match self {
-            Object::Sphere(obj) => obj.normal(ray),
-            Object::Plane(obj) => obj.normal(ray),
-            Object::Triangle(obj) => obj.normal(),
-        }
-    }
-
-    pub fn color(&self) -> &Vec3d {
-        match self {
-            Object::Sphere(obj) => obj.color(),
-            Object::Plane(obj) => obj.color(),
-            Object::Triangle(obj) => obj.color(),
-        }
-    }
-    
-    pub fn material(&self) -> &Material {
-        match self {
-            Object::Sphere(obj) => &obj.material,
-            Object::Plane(obj) => &obj.material,
-            Object::Triangle(obj) => &obj.material,
         }
     }
 }
@@ -63,7 +31,7 @@ pub struct Sphere {
 
 impl Sphere {
     /// returns t for the ray if hit, else returns None
-    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
+    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<RayHitfo> {
         let oc = ray.pos-self.center;
         let neg_b = -ray.dir.dot(oc);
         let b_sq = ray.dir.dot(ray.dir);
@@ -84,19 +52,20 @@ impl Sphere {
         if t < t_correction { // ray hitting behind the camera or really close to object ( t < 0.0000001 for really close thing)
             return None
         }
-        Some(t)
+        
+        let mut ray = ray.clone();
+        ray.new_pos(t);
+        Some(RayHitfo {
+            t,
+            normal: self.normal(&ray),
+            ray,
+            material: self.material.clone(),
+        })
     }
 
-    pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
-        self.material.scatter(ray, &mut self.normal(ray), rng)
-    }
-
+    #[inline(always)]
     pub fn normal(&self, ray: &Ray) -> Vec3d {
         (ray.pos - self.center).unit()
-    }
-
-    pub fn color(&self) -> &Vec3d {
-        self.material.color()
     }
 }
 
@@ -107,36 +76,39 @@ pub struct Plane {
 }
 
 impl Plane {
-    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
+    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<RayHitfo> {
         // (a+bt-p).n = 0 -> t = ((p-a).n)/(b.n) : ray is a+bt, p is a point on plane, n is normal to plane
 
-        // let normal = self.normal(ray);
         let normal = self.normal;
         let t = (self.point-ray.pos).dot(normal)/ray.dir.dot(normal); // normal or -ve normal dosent matter here cuz normal is in both num and denom
-        if t > t_correction {Some(t)} else {None}
+        if t > t_correction {
+            let mut ray = ray.clone();
+            ray.new_pos(t);
+            Some(RayHitfo {
+                t,
+                normal: self.normal(&ray),
+                ray,
+                material: self.material.clone(),
+            })
+        } else {None}
     }
 
-    pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
-        self.material.scatter(ray, &mut self.normal(ray), rng)
-    }
-
+    #[inline(always)]
     pub fn normal(&self, ray: &Ray) -> Vec3d {
         if self.normal.dot(ray.dir) < 0.0 {self.normal.unit()} else {self.normal.unit()*(-1.0)}
     }
-
-    pub fn color(&self) -> &Vec3d {
-        self.material.color()
-    }
 }
 
+// refactoring needed for rayhitfo (down)
+
 pub struct Triangle {
-    pub vertices: (Vec3d, Vec3d, Vec3d),
+    vertex_indices: (u32, u32, u32),
     pub normal: Vec3d,
     pub material: Material,
 }
 
 impl Triangle {
-    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {
+    pub fn hit(&self, vertices: (Vec3d, Vec3d, Vec3d), ray: &Ray, t_correction: f64) -> Option<f64> {
         // M-1
         // let OAB (clockwise) be a triangle if A.cross(P).dot(N) > 0 and B.cross(P).dot(N) < 0 -> P is inside
         // N is normal = A.cross(B), and P is the required point
@@ -149,12 +121,12 @@ impl Triangle {
         // D can be calculated by a.dot(b.cross(c))
 
         // finding t by plane intersection
-        let t = (self.vertices.0-ray.pos).dot(self.normal)/ray.dir.dot(self.normal);
+        let t = (vertices.0-ray.pos).dot(self.normal)/ray.dir.dot(self.normal);
         if t < t_correction {return None}
 
-        let A = self.vertices.0;
-        let B = self.vertices.1;
-        let C = self.vertices.2;
+        let A = vertices.0;
+        let B = vertices.1;
+        let C = vertices.2;
         let a = ray.pos;
         let b = ray.dir;
         let Ama = A-a;
@@ -170,6 +142,10 @@ impl Triangle {
         Some(t)
     }
 
+    fn get_vertices(&self, vertices: Arc<Vec<Vec3d>>) -> (Vec3d, Vec3d, Vec3d) {
+        (vertices[self.vertex_indices.0 as usize], vertices[self.vertex_indices.1 as usize], vertices[self.vertex_indices.2 as usize])
+    }
+
     pub fn scatter(&self, ray: &Ray, rng: &mut Rng) -> Option<Ray> {
         self.material.scatter(ray, &mut self.normal(), rng)
     }
@@ -182,3 +158,19 @@ impl Triangle {
         self.material.color()
     }
 }
+
+pub struct TriangleMesh {
+    vertices: Arc/* or Box?(why rc for something inside a struct)*/<Vec<Vec3d>>, // meshes inside meshes??
+    triangles: Arc<Vec<Triangle>>,
+    // bounding_box: (Vec3d, Vec3d), // min, max // axis aligned
+    position: Vec3d, // we can use this to move objects without editing all coords (notes)
+    bounding_box: (Vec3d, Vec3d, Vec3d, Vec3d), // position of a corner, xdir, ydir, zdir // not axis aligned // we can get axis aligned using this
+}
+// read notes
+
+
+// impl Octree {
+//     pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<f64> {}
+
+//     pub fn normal(&self, ray: &Ray) -> Vec3d {}
+// }
