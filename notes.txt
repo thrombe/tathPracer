@@ -2,13 +2,12 @@
 todo/ideas:
   /. ram probs due to multi-core stuff
     /. this isnt too much of a problem as the size is max 8*5k*5k*(1*8 f64) bytes -> 1.5 GB or *= 3/8 for (3*1 u8)
-  . use enum for multiple types of objects?
+  . use f64::infinity or whatever consts
   . multiple samples if material is lambertian ????
   . multi-colored materials (all types?)
     . this will look cool on random objects (like the velvet coats or whatever)
     . color as a function of direction of normal (like that of sky)
     . color as func of angle with normal?
-  . try colors > 1 on all materials
   . better fresnel or whatever
     . instead of randomising reflection and refraction, a part of them should bounce and a part should refract
   . more materials
@@ -30,28 +29,50 @@ todo/ideas:
         . fuzz
         . direction
         . color
-    . how do i make the objects peleport through these?
+    . how do i make the objects teleport through these?
   . bounding boxes using 2 vectors
+  . triangle meshes
+    . how do i store the vertices? just a vec wouldnt be very efficient
+    . maybe mesh bounding box, + some structure with bounding boxes of groups of triangles
+    . keep position in struct, we can move objects without having to modify all vertices using it
+      . ray pos -= position
+      . will also have to keep a matrix to rotate the ray dir correctly
+      . this isnt very efficient for static scenes tho cuz we dont need to move objects often
+    . maybe aabb thing for triangels and oct-tree for rest?
+    . oct-tree 
+      . this way, i can have a lot of objects without too much probs
+      . i can use marching cubes to create terrain and render it on fly (dont need to store it)
+        . if storage is a big prob, then create it while tracing rays, tho this will be slow af
+        . mayeb i can cache a few cubes so that we only create the cube once (per thread) and reuse it for all rays in that pixel (group of pixels)
+      . how do i store triangles in it tho?
+        /. VERY COMPLEX IT SEEMS
+        \. triangles can be huge and will have to exist in multiple cubes
+          \. sorting is kinda easy once we have the cubes - just use the bounding box to add it to every cube it intersects with
+        \. or triangles can be stored in oct-tree using some index in array of triangles
+          \. finding what cubes to put the triangle in is a pain tho. but atleast it doable this way
+          \. so, go through each triangle and see what cubes it should be in, then re-do that part of oct-tree for max no. of things in a voxel thing
+             or whatever in recursive fashion
+            \. but some exceptions should be there while doing this, cuz many triangles can share same vertex
+        \. or clip triangles till it fits in a leaf + limit to how small it can go
+        . OR store a triangle in the smallest cube it fits in, dosent matter if its a leaf or branch
+          . this way, no duplicates
+      . maybe convert triangle meshes into voxel things first and then do the tracing
+        . how voxelise?
+          . triangle meshes are closed usually, so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
+            . the interior can have big voxels
+            . maybe voxels can be filled like rasterisation. move a point along the area of triangle and put a voxel there
+        . voxels can be efficiently stored in an octree
+          . enum u8 with 1bit is 1 subvoxel in it, if it contains more levels then it has u8 in it
+            \. 1GB -> smallest leaf is 1mm, 128*128 metre³ volume (completely full octree)
+              \. but nor info? like normals and colors and materials
+            . how materials + color?
+              \. (nope dosent work like that) empty enums with each voxel? how tf would this work. no extra space is used, but then how is it even possible?
+              \. store color in the biggest voxel of all same type, same with voxel type
+                \. im already doing sparse compression thing tho
+              . store all unique materials and colors (seperately) in vecs and have voxels(parent branch, not leaves) 
+                contain a u32/u16(68k possibilities) index value to this
+              . or have each branch store the materials of their children
   . more shapes
-    . planes
-      . (a+bt-p).n = 0 -> t = ((p-a).n)/(b.n) : ray is a+bt, p is a point on plane, n is normal to plane
-    . triangles
-      . first find point on plane
-      . then the area method to see if it lies inside
-        . too much computation?
-      . or find barycentric coords and check
-        . formula on wiki
-      . or check what side of the lines the point lies on (like does it lies on the same side as the third vertex)
-      . or check for methods from other implementations
-      . let OAB (clockwise) be a triangle if A.cross(P).dot(N) > 0 and B.cross(P).dot(N) < 0 -> P is inside
-        N is normal = A.cross(B), and P is the required point
-      . EVEN BETTER
-        let ABC be triangle, a+bt be ray, a+bt=A(1-w2-w3)+Bw2+Cw3 (barycentric coords)
-        A-a=[b, A-B, A-C]*[[t], [w2], [w3]] then apply crammers rule
-        (remember b, A-B .. are vectors, so that is a 3x3 matrix)
-        calculate D, D1, D2, D3, if D != 0(close to 0 cuz float)(if D<0, triangle is backwards), t = D1/D ....
-        . D can be calculated by a.dot(b.cross(c))
-        . maybe intersecting with plane first(early bailout) and t > 0 could be faster? idk
     . rays/lines (will be cool to view rays)
       . how? these are a bit too thin
     . lens

@@ -7,7 +7,7 @@ use super::ray::Ray;
 use super::world::Rng;
 use super::math;
 
-
+#[derive(Debug)]
 pub enum Material {
     Lambertian(Lambertian),
     Metal(Metal),
@@ -15,21 +15,25 @@ pub enum Material {
     Lit(Lit), // this can be used as lit if color is greater than 1 and as flat colored stuff if color < 1 (black body if color = 0)
 }
 
+#[derive(Debug)]
 pub struct Lambertian {
     pub color: Vec3d,
 }
 
+#[derive(Debug)]
 pub struct Metal {
     pub color: Vec3d,
     pub fuzz: f64,
 }
 
+#[derive(Debug)]
 pub struct Dielectric {
     pub color: Vec3d,
     pub refractive_index: f64,
     pub fuzz: f64,
 }
 
+#[derive(Debug)]
 pub struct Lit {
     pub color: Vec3d,
 }
