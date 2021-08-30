@@ -5,7 +5,7 @@ use super::vec3d::Vec3d;
 use super::material::Material;
 use super::world::Rng;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Ray {
     pub pos: Vec3d,
     pub dir: Vec3d,
@@ -22,6 +22,7 @@ impl Ray {
     }
 }
 
+#[derive(Debug)]
 pub struct RayHitfo { // hit-info?
     pub t: f64,
     pub normal: Vec3d,
