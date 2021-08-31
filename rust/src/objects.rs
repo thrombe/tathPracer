@@ -104,8 +104,6 @@ impl Octree {
         // intersect the bb and return if not hit
         // todo
         
-        // does this work when ray originates from side the tree?
-
         let ray = Ray::new(self.world_to_tree_space(ray.pos), ray.dir);
         let mut planes = OctreePos::get_rub_masks();
         let mut bbox_min = Vec3d::new(-1.0, -1.0, -1.0);
@@ -156,6 +154,8 @@ impl Octree {
         }
         let tm = t0 + dt;
 
+        // t value for first voxel is max(t for bbox.min)
+        // how? -> well, the ray is in the voxel only if its inside all 3 plane boundaries. so max(t0) ensures this
         if let Some(hitfo) = self.main_branch.hit(&ray, t0.z, planes.2, planes, &dt, &tm) {
            Some(RayHitfo {
             //    t: self.tree_to_world_space_f64(hitfo.t),
@@ -241,6 +241,7 @@ impl OctreeBranch { // t, t_plane, planes, dt, tm
             }
         } else if child_mask & self.child_mask > 0 {
             // its a voxel. so return
+            if t < 0.0 {return None} // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
             let mut ray = ray.clone();
             ray.new_pos(t);
             return Some(RayHitfo {
