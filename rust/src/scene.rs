@@ -6,10 +6,16 @@ use super::vec3d::Vec3d;
 
 use super::world::{World, Camera};
 use super::objects::{Object, Sphere, Plane, Triangle};
+use super::octree::{Octree, OctreeBranch, OctreePos};
 use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 
 pub fn gen_world() -> World {
+    // scene1()
+    octree_test()
+}
+
+fn scene1() -> World {
 
     let width = 720;
     let height = 480;
@@ -189,5 +195,36 @@ pub fn gen_world() -> World {
         }
     }
 
+    world
+}
+
+
+fn octree_test() -> World {
+
+    let width = 720;
+    let height = 480;
+    let fov = PI/3.0;
+    let samples_per_pixel = 10;
+    let aperture = 0.0;
+    let cam_position = Vec3d::new(0.03, 0.20, 5.0);
+    let look_at = Vec3d::new(-0.50, 0.50, 0.50);
+
+    let mut world = World {
+        cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
+        objects: Vec::<Object>::new(),
+    };
+
+    let mut oct = Octree::new(2.0);
+    
+
+    oct.insert_voxel(Vec3d::new(-0.50, 0.50, 0.50), 2);
+
+    // let mut rng = rand::thread_rng();
+    // let random = Uniform::new(-1.0, 1.0);
+    // for _ in 0..1 {
+    //     oct.insert_voxel(Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng)), 0);
+    // }
+    
+    world.objects.push(Object::Octree(oct));
     world
 }

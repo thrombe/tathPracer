@@ -102,7 +102,9 @@ impl Camera {
         let mut offset = self.right*random_in_unit_disc.0 + self.up*random_in_unit_disc.1;
         offset *= self.lens_radius;
         // this ray formation is like shifting the camera by some offset, while looking at the same point
-        Ray::new(self.pos + offset, self.topleft - offset + self.scr_horizontal*x + self.scr_vertical*y)
+        let mut ray = Ray::new(self.pos + offset, self.topleft - offset + self.scr_horizontal*x + self.scr_vertical*y);
+        ray.dir = ray.dir.unit();
+        ray
     }
 
     pub fn set_focus_length(&mut self, focus_length: f64) {

@@ -71,6 +71,7 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
     }
 
     fn get_pos_from_point(&self, point: &Vec3d) -> OctreePos {
+        println!("point {:?}", point);
         let (r, u, b) = OctreePos::get_rub_masks();
         let mut pos = if point.x >= 0.0 {r} else {!r};
         pos &= if point.y >= 0.0 {u} else {!u};
@@ -104,13 +105,13 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
 
     fn insert_voxel_from_point(&mut self, point: Vec3d, depth: usize) {
         let pos = self.get_pos_from_point(&point);
-        // println!("{:?}", pos);
+        println!("{:?}", pos);
         if depth == 0 {
             self.set_voxel(pos);
             return
         }
         let branch = self.add_branch(pos);
-        branch.insert_voxel_from_point(point-branch.get_coord(), depth-1);
+        branch.insert_voxel_from_point((point-branch.get_coord())*2.0, depth-1);
     }
     
     fn add_branch(&mut self, pos: OctreePos) -> &mut Self {
@@ -167,7 +168,10 @@ impl OctreePos {
             0b_00100000 => OctreePos::LDF,
             0b_01000000 => OctreePos::LDB,
             0b_10000000 => OctreePos::RDB,
-            _ => panic!(),
+            _ => {
+                println!("maskkkk --- {:?}", mask);
+                panic!();
+            },
         }
     }
 
