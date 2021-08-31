@@ -105,9 +105,6 @@ impl Octree {
         // todo
         
         // does this work when ray originates from side the tree?
-        // for the -ve ray.dir thing, try flipping the bbox points instead
-          // if dir.x -ve, bbox.x *= -1, r = !r
-          // if this works, i wont have to change multiple things. this looks less like a hack
 
         let ray = Ray::new(self.world_to_tree_space(ray.pos), ray.dir);
         let mut planes = OctreePos::get_rub_masks();
@@ -192,135 +189,46 @@ impl OctreeBranch { // t, t_plane, planes, dt, tm
         let entry_child_mask = !t_plane
                                & if tm.x < t {planes.0} else {!planes.0}
                                & if tm.y < t {planes.1} else {!planes.1};
+        // t value for first sub voxel is same as of the main voxel
         if let Some(hitfo) = self.try_hit_subvoxel(entry_child_mask, ray, t, t_plane, planes, &dt, &(*tm-dt)) {
             return Some(hitfo)
         }
-        // if entry_child_mask & self.branch_mask > 0 {
-        //     // visit the child
-        //     let child = self.get_branch(OctreePos::new(entry_child_mask));
-        //     let t = t;
-        //     let tm = *tm-dt;
-        //     // t value for first sub voxel is same as of the main voxel
-        //     if let Some(hitfo) = child.hit(ray, t, t_plane, planes, &dt, &tm) {
-        //         return Some(hitfo)
-        //     }
-        // } else if entry_child_mask & self.child_mask > 0 {
-        //     // its a voxel. so return
-        //     let mut ray = ray.clone();
-        //     ray.new_pos(t);
-        //     return Some(RayHitfo {
-        //         t,
-        //         normal: Vec3d::new(1.0, 1.0, 1.0),
-        //         material: Material::Lit(Lit {color: Vec3d::zero()}),
-        //         ray,
-        //     })
-        // }
         // its an off voxel or its inner voxels were not hit. so visit next
-        let mouve = |child: u8, plane_mask: u8| -> Option<u8> { // gives the voxel_map when crossing a plane (after crossing the yz plane, we either go to the right voxel, or exit)
-            if child & plane_mask > 0 {return None} // child is already in that side (eg -> move right (but im already in right, ig ill exit))
-            // we need to know here what plane the plane_mask refers to
-            let mut other_masks = {
-                if plane_mask == planes.0 || plane_mask == !planes.0 {(planes.1, planes.2)}
-                else if plane_mask == planes.1 || plane_mask == !planes.1 {(planes.0, planes.2)}
-                else {(planes.0, planes.1)}
-            };
-            other_masks.0 = if other_masks.0 & child > 0 {other_masks.0} else {!other_masks.0};
-            other_masks.1 = if other_masks.1 & child > 0 {other_masks.1} else {!other_masks.1};
-            let next = plane_mask & other_masks.0 & other_masks.1;
-            // eg: to more right from LDB, we first find the mask of every voxel with DB and "&" it with plane_mask(R) to the the voxel towards right
-            Some(next)
-        };
 
         // crossing the first mid plane (planes.0)
         let c1: u8;
-        match mouve(entry_child_mask, planes.0) {
-            Some(ueight) => c1 = ueight,
+        match self.get_next_voxel(entry_child_mask, planes.0, planes) {
+            Some(next) => c1 = next,
             None => return None,
         }
         //enter c1
+        // this plane is crossed at tm.x, so this becomes the t for next sub_voxel
+        // crossed this plane, so we add the dt.x (cuz the mid plane of that voxel is at that t)
         if let Some(hitfo) = self.try_hit_subvoxel(c1, ray, tm.x, planes.0, planes, &dt, &Vec3d::new(tm.x + dt.x, tm.y - dt.y, tm.z - dt.z)) {
             return Some(hitfo)
         }
-        // if c1 & self.branch_mask > 0 {
-        //     let child = self.get_branch(OctreePos::new(c1));
-        //     let t = tm.x; // this plane is crossed at tm.x, so this becomes the t for next sub_voxel
-        //     let tm = Vec3d::new(tm.x + dt.x, tm.y - dt.y, tm.z - dt.z); // crossed this plane, so we add the dt.x (cuz the mid plane of that voxel is at that t)
-        //     if let Some(hitfo) = child.hit(ray, t, planes.0, planes, &dt, &tm) {
-        //         return Some(hitfo)
-        //     }
-        // } else if c1 & self.child_mask > 0 {
-        //     // its a voxel. so return
-        //     let t = tm.x;
-        //     let mut ray = ray.clone();
-        //     ray.new_pos(t);
-        //     return Some(RayHitfo {
-        //         t,
-        //         normal: Vec3d::new(1.0, 1.0, 1.0),
-        //         material: Material::Lit(Lit {color: Vec3d::zero()}),
-        //         ray,
-        //     })
-        // }
 
         // crossing the second mid plane
         let c2: u8;
-        match mouve(c1, planes.1) {
-            Some(ueight) => c2 = ueight,
+        match self.get_next_voxel(c1, planes.1, planes) {
+            Some(next) => c2 = next,
             None => return None,
         }
         //enter c2
         if let Some(hitfo) = self.try_hit_subvoxel(c2, ray, tm.y, planes.1, planes, &dt, &Vec3d::new(tm.x + dt.x, tm.y + dt.y, tm.z - dt.z)) {
             return Some(hitfo)
         }
-        // if c2 & self.branch_mask > 0 {
-        //     let child = self.get_branch(OctreePos::new(c2));
-        //     let t = tm.y;
-        //     let tm = Vec3d::new(tm.x + dt.x, tm.y + dt.y, tm.z - dt.z);
-        //     if let Some(hitfo) = child.hit(ray, t, planes.1, planes, &dt, &tm) {
-        //         return Some(hitfo)
-        //     }
-        // } else if c2 & self.child_mask > 0 {
-        //     // its a voxel. so return?
-        //     let t = tm.y;
-        //     let mut ray = ray.clone();
-        //     ray.new_pos(t);
-        //     return Some(RayHitfo {
-        //         t,
-        //         normal: Vec3d::new(1.0, 1.0, 1.0),
-        //         material: Material::Lit(Lit {color: Vec3d::zero()}),
-        //         ray,
-        //     })
-        // }
 
-        // crossing the thirs plane
+        // crossing the third plane
         let c3: u8;
-        match mouve(c2, planes.2) {
-            Some(ueight) => c3 = ueight,
+        match self.get_next_voxel(c2, planes.2, planes) {
+            Some(next) => c3 = next,
             None => return None,
         }
         //enter c3
         if let Some(hitfo) = self.try_hit_subvoxel(c3, ray, tm.z, planes.2, planes, &dt, &Vec3d::new(tm.x + dt.x, tm.y + dt.y, tm.z + dt.z)) {
             return Some(hitfo)
         }
-        // if c3 & self.branch_mask > 0 {
-        //     // visit the child
-        //     let child = self.get_branch(OctreePos::new(c3));
-        //     let t = tm.z;
-        //     let tm = Vec3d::new(tm.x + dt.x, tm.y + dt.y, tm.z + dt.z);
-        //     if let Some(hitfo) = child.hit(ray, t, planes.2, planes, &dt, &tm) {
-        //         return Some(hitfo)
-        //     }
-        // } else if c3 & self.child_mask > 0 {
-        //     // its a voxel. so return
-        //     let t = tm.z;
-        //     let mut ray = ray.clone();
-        //     ray.new_pos(t);
-        //     return Some(RayHitfo {
-        //         t,
-        //         normal: Vec3d::new(1.0, 1.0, 1.0),
-        //         material: Material::Lit(Lit {color: Vec3d::zero()}),
-        //         ray,
-        //     })
-        // }
         None
     }
 
@@ -332,6 +240,7 @@ impl OctreeBranch { // t, t_plane, planes, dt, tm
                 return Some(hitfo)
             }
         } else if child_mask & self.child_mask > 0 {
+            // its a voxel. so return
             let mut ray = ray.clone();
             ray.new_pos(t);
             return Some(RayHitfo {
@@ -342,6 +251,23 @@ impl OctreeBranch { // t, t_plane, planes, dt, tm
             })
         }
         None
+    }
+
+    #[inline(always)]
+    fn get_next_voxel(&self, child: u8, plane_mask: u8, planes: (u8, u8, u8)) -> Option<u8> {
+        // gives the voxel_map when crossing a plane (after crossing the yz plane, we either go to the right voxel, or exit)
+        if child & plane_mask > 0 {return None} // child is already in that side (eg -> move right (but im already in right, ig ill exit))
+        // we need to know here what plane the plane_mask refers to
+        let mut other_masks = {
+            if plane_mask == planes.0 || plane_mask == !planes.0 {(planes.1, planes.2)}
+            else if plane_mask == planes.1 || plane_mask == !planes.1 {(planes.0, planes.2)}
+            else {(planes.0, planes.1)}
+        };
+        other_masks.0 = if other_masks.0 & child > 0 {other_masks.0} else {!other_masks.0};
+        other_masks.1 = if other_masks.1 & child > 0 {other_masks.1} else {!other_masks.1};
+        let next = plane_mask & other_masks.0 & other_masks.1;
+        // eg: to more right from LDB, we first find the mask of every voxel with DB and "&" it with plane_mask(R) to the the voxel towards right
+        Some(next)
     }
 }
 
