@@ -2,7 +2,7 @@
 // use std::sync::{Arc, RwLock};
 
 use super::vec3d::Vec3d;
-use super::material::Material;
+use super::material::{Material, Lit};
 use super::math;
 
 #[derive(Debug)]
@@ -11,7 +11,7 @@ pub struct Octree {
     half_size: f64,
     pub scale_factor: f64,
     pub main_branch: OctreeBranch,
-    // materials: Vec<Material>,
+    pub materials: Vec<Material>, // material at 0 index should be some default material for undefined stuff
 }
 
 impl Octree {
@@ -20,14 +20,20 @@ impl Octree {
             half_size: size/2.0,
             scale_factor: 2.0/size,
             main_branch: OctreeBranch::new(OctreePos::Main),
-            // materials: Vec::<Material>::new(),
+            materials: vec![Material::Lit(Lit {color: Vec3d::zero()})],
         }
     }
 
-    pub fn insert_voxel(&mut self, mut point: Vec3d, depth: usize) {
+    /// add new material using this, and use the returned index to fill in voxels
+    pub fn add_material(&mut self, material: Material) -> u32 {
+        self.materials.push(material);
+        (self.materials.len()-1) as u32
+    }
+
+    pub fn insert_voxel(&mut self, mut point: Vec3d, depth: usize, material_index: u32, normal: Option<Vec3d>) {
         point = self.world_to_tree_space(point);
         if (math::abs(point.x) > 1.0) || (math::abs(point.y) > 1.0) || (math::abs(point.z) > 1.0) {panic!()}
-        self.main_branch.insert_voxel_from_point(point, depth);
+        self.main_branch.insert_voxel_from_point(point, depth, material_index, normal);
     }
 
     pub fn world_to_tree_space(&self, pos: Vec3d) -> Vec3d {
@@ -51,17 +57,18 @@ pub struct OctreeBranch {
     pub pos: OctreePos,
     pub child_mask: u8,
     pub branch_mask: u8, // if branch, the bit is set
-    pub chilranches: Box<Vec<OctreeBranch>>, // index -> same as normals but with branch_mask
-    // normal_mask: u8, // this space was being wasted anyway // if set, then this voxel has normal
-    // normals: Box<Vec<Vec3d>>, // index -> the index of the voxel in the normal_mask while ignoring 0's,
+    pub chilranches: Vec<OctreeBranch>, // index -> same as normals but with branch_mask
+    pub normal_mask: u8, // this space was being wasted anyway // if set, then this voxel has normal
+    pub normals: Vec<Vec3d>, // index -> the index of the voxel in the normal_mask while ignoring 0's,
     // for eg, 01001000(normal_map), normal for 01000000(voxel) is 1 and for 00001000(voxel) is 0
-    // material: u32, // index from Octree.materials
+    pub materials: Vec<u32>, // index from Octree.materials
 }
 
 impl OctreeBranch { // all branches consider their space as -1 to 1
     fn new(pos: OctreePos) -> Self {
         Self {
-            pos, child_mask: 0, branch_mask: 0, chilranches: Box::new(Vec::<Self>::new()),
+            pos, child_mask: 0, branch_mask: 0, chilranches: Vec::<Self>::new(), normal_mask: 0,
+            normals: Vec::<Vec3d>::new(), materials: Vec::<u32>::new(),
         }
     }
 
@@ -75,8 +82,17 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
         OctreePos::new(pos)
     }
     
-    fn set_voxel(&mut self, pos: OctreePos) {
-        self.child_mask = self.child_mask | pos.get_mask();
+    fn set_voxel(&mut self, pos: OctreePos, material_index: u32, normal: Option<Vec3d>) {
+        let pos_mask = pos.get_mask();
+        self.child_mask = self.child_mask | pos_mask;
+        
+        match normal {
+            Some(normal) => self.insert_normal(normal, pos_mask),
+            None => (),
+        }
+        
+        let index = self.get_info_index(self.child_mask, pos_mask);
+        self.materials.insert(index, material_index)
     }
 
     // in self space
@@ -99,47 +115,57 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
         self.get_voxel_coord(self.pos)
     }
 
-    fn insert_voxel_from_point(&mut self, point: Vec3d, depth: usize) {
+    fn insert_voxel_from_point(&mut self, point: Vec3d, depth: usize, material_index: u32, normal: Option<Vec3d>) {
         let pos = self.get_pos_from_point(&point);
         // println!("{:?}", pos);
         if depth == 0 {
-            self.set_voxel(pos);
+            self.set_voxel(pos, material_index, normal);
             return
         }
-        let branch = self.add_branch(pos);
-        branch.insert_voxel_from_point((point-branch.get_coord())*2.0, depth-1);
+        let branch = self.add_branch(pos, material_index, normal);
+        branch.insert_voxel_from_point((point-branch.get_coord())*2.0, depth-1, material_index, normal);
     }
     
-    fn add_branch(&mut self, pos: OctreePos) -> &mut Self {
-        self.set_voxel(pos);
+    fn add_branch(&mut self, pos: OctreePos, material_index: u32, normal: Option<Vec3d>) -> &mut Self {
+        self.set_voxel(pos, material_index, normal);
         let pos_mask = pos.get_mask();
         if (self.branch_mask & pos_mask) > 0 {return self.get_branch_mut(pos)}
         self.branch_mask = self.branch_mask | pos_mask;
         let chilranch = Self::new(pos);
         // insert branch at correct index
-        let index = self.get_branch_index(pos);
+        let index = self.get_info_index(self.branch_mask, pos_mask);
         self.chilranches.insert(index, chilranch);
         &mut self.chilranches[index]
     }
 
-    pub fn get_branch_mut(&mut self, pos: OctreePos) -> &mut Self {
-        let index = self.get_branch_index(pos);
-        &mut self.chilranches[index]
+    // find where the normal should go (index), and correctly set/modify normals and indices
+    fn insert_normal(&mut self, normal: Vec3d, pos_mask: u8) {
+        self.normal_mask = self.normal_mask | pos_mask;
+        let index = self.get_info_index(self.normal_mask, pos_mask);
+        self.normals.insert(index, normal);
     }
 
+    pub fn get_branch_mut(&mut self, pos: OctreePos) -> &mut Self {
+        let index = self.get_info_index(self.branch_mask, pos.get_mask());
+        &mut self.chilranches[index]
+    }
+    
     pub fn get_branch(&self, pos: OctreePos) -> &Self {
-        let index = self.get_branch_index(pos);
+        let index = self.get_info_index(self.branch_mask, pos.get_mask());
         &self.chilranches[index]
     }
 
-    /// assuming that there is a branch for this
-    fn get_branch_index(&self, pos: OctreePos) -> usize {
-        let pos_mask = pos.get_mask();
+    pub fn get_normal(&self, pos_mask: u8) -> &Vec3d {
+        &self.normals[self.get_info_index(self.normal_mask, pos_mask)]
+    }
+
+    /// assuming that there is info for this voxel
+    pub fn get_info_index(&self, info_mask: u8, pos_mask: u8) -> usize {
         let mut count = 0;
         let mut mask = 1;
         for _ in 0..8 {
             if mask == pos_mask {return count}
-            if (self.branch_mask & mask) > 0 {count += 1}
+            if (info_mask & mask) > 0 {count += 1}
             mask *= 2; // move the on bit left
         }
         count // code never gets here, but rust complains. smh my head

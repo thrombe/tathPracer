@@ -214,16 +214,28 @@ fn octree_test() -> World {
         objects: Vec::<Object>::new(),
     };
 
+    // this seems slowish, profiling needed
+
     let mut oct = Octree::new(2.0);
     
+    let material = Material::Lambertian(Lambertian {
+        color: Vec3d::new(0.7, 0.4, 0.7),
+    });
+    let material_index = oct.add_material(material);
 
-    // oct.insert_voxel(Vec3d::new(-0.99, -0.99, -0.99), 2);
-    // oct.insert_voxel(Vec3d::new(0.99, 0.99, 0.99), 2);
+    let point = Vec3d::new(-0.99, -0.99, -0.99);
+    let normal = point.clone();
+    oct.insert_voxel(point, 0, material_index, Some(normal));
+    let point = Vec3d::new(0.99, 0.99, 0.99);
+    let normal = point.clone();
+    oct.insert_voxel(point, 0, material_index, Some(normal));
 
     let mut rng = rand::thread_rng();
     let random = Uniform::new(-1.0, 1.0);
     for _ in 0..100000 {
-        oct.insert_voxel(Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng)), 7);
+        let point = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng));
+        let normal = point.clone().unit();
+        oct.insert_voxel(point, 7, 0, Some(normal));
     }
     
     world.objects.push(Object::Octree(oct));

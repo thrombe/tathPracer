@@ -33,7 +33,7 @@ pub fn test() {
     // println!("{:?}", size_of::<Vec<f64>>());
     let mut oct = Octree::new(2.0);
     let point = Vec3d::new(-0.125, -0.125, -0.125);
-    oct.insert_voxel(point, 0);
+    // oct.insert_voxel(point, 0);
     // println!("{:?}", oct);
     println!("");
     let at = Vec3d::new(-1.5, -0.125, -0.125);

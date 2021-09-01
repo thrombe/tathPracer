@@ -156,8 +156,9 @@ impl Octree {
         // how? -> well, the ray is in the voxel only if its inside all 3 plane boundaries. so max(t0) ensures this
         if let Some(hitfo) = self.main_branch.hit(&ray, t, t0, &dt) {
            Some(RayHitfo {
-               ray: Ray::new(self.tree_to_world_space(hitfo.ray.pos), hitfo.ray.dir),
-               ..hitfo
+               ray: Ray::new(self.tree_to_world_space(hitfo.0.ray.pos), hitfo.0.ray.dir),
+               material: self.materials[hitfo.1 as usize].clone(),
+               ..hitfo.0
            })
         } else {
             None
@@ -171,7 +172,7 @@ impl OctreeBranch {
     // eg: let 000 represent x, y, z, so 111 & 010 would mean gimme something (out of 111) that has y = 1 (this makes more sense with u8 but im lazy)
 
     // dt is current branch's (t1-t0)/2
-    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d) -> Option<RayHitfo> {
+    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d) -> Option<(RayHitfo, u32)> {
         // dbg!(self.pos);
 
         // since the planes are parallel and seperated by a constant amount, we just need some addition
@@ -209,7 +210,7 @@ impl OctreeBranch {
     }
 
     #[inline(always)]
-    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d) -> Option<RayHitfo> {
+    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d) -> Option<(RayHitfo, u32)> {
         if child_mask & self.branch_mask > 0 { // check if the voxel is a branch
             let child = self.get_branch(OctreePos::new(child_mask));
             let t0 = self.get_t0_for(child_mask, dt, t0);
@@ -220,12 +221,12 @@ impl OctreeBranch {
             if t.t < 0.0 {return None} // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
             let mut ray = ray.clone();
             ray.new_pos(t.t);
-            return Some(RayHitfo {
+            return Some((RayHitfo {
                 t: t.t,
-                normal: Vec3d::new(1.0, 1.0, 1.0),
+                normal: self.get_normal(child_mask).clone(),
                 material: Material::Lit(Lit {color: Vec3d::zero()}),
                 ray,
-            })
+            }, self.materials[self.get_info_index(self.child_mask, child_mask)]))
         }
         None
     }
