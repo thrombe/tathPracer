@@ -1,5 +1,5 @@
 
-use std::sync::{Arc, RwLock};
+// use std::sync::{Arc, RwLock};
 
 use super::vec3d::Vec3d;
 use super::material::Material;
@@ -11,7 +11,6 @@ pub struct Octree {
     half_size: f64,
     pub scale_factor: f64,
     pub main_branch: OctreeBranch,
-    // materials: Arc<Vec<Material>>, // do vecs need box to be in a struct?
     // materials: Vec<Material>,
 }
 
@@ -21,7 +20,6 @@ impl Octree {
             half_size: size/2.0,
             scale_factor: 2.0/size,
             main_branch: OctreeBranch::new(OctreePos::Main),
-            // materials: Arc::new(Vec::<Material>::new()),
             // materials: Vec::<Material>::new(),
         }
     }
@@ -40,13 +38,10 @@ impl Octree {
         pos*self.half_size
     }
 
-    // pub fn tree_to_world_space_f64(&self, t: f64) -> f64 {
-    //     t*self.half_size
-    // } why is this needed?
-
     /// deletes empty branches, deletes unnecessary voxels
     pub fn compress_sparseness(&mut self) {
         // check normals too!!
+        todo!();
     }
 }
 
@@ -58,7 +53,7 @@ pub struct OctreeBranch {
     pub branch_mask: u8, // if branch, the bit is set
     pub chilranches: Box<Vec<OctreeBranch>>, // index -> same as normals but with branch_mask
     // normal_mask: u8, // this space was being wasted anyway // if set, then this voxel has normal
-    // normals: Arc<Vec<Vec3d>>, // index -> the index of the voxel in the normal_mask while ignoring 0's,
+    // normals: Box<Vec<Vec3d>>, // index -> the index of the voxel in the normal_mask while ignoring 0's,
     // for eg, 01001000(normal_map), normal for 01000000(voxel) is 1 and for 00001000(voxel) is 0
     // material: u32, // index from Octree.materials
 }
@@ -70,6 +65,7 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
         }
     }
 
+    // bias towards +ve direction(if on line)
     fn get_pos_from_point(&self, point: &Vec3d) -> OctreePos {
         // println!("point {:?}", point);
         let (r, u, b) = OctreePos::get_rub_masks();
@@ -186,7 +182,6 @@ impl OctreePos {
             OctreePos::LDB => 0b_01000000,
             OctreePos::RDB => 0b_10000000,
             OctreePos::Main => panic!(),
-            // OctreePos::Exit => panic!(),
         }
     }
     
@@ -199,9 +194,51 @@ impl OctreePos {
     }
 }
 
-// #[derive(Debug)]
-// struct Leaf<'a> {
-//     pos: OctreePos,
-//     normal: &'a Vec3d,
-//     color: &'a Vec3d,
-// }
+#[derive(Clone, Copy, Debug)]
+pub struct BbHit { // bounding box hit
+  pub t: f64,
+  pub plane: u8,
+}
+
+impl BbHit {
+    pub fn new(t: f64, plane: u8)-> Self {
+        Self {t, plane}
+    }
+
+    // sort all ts in ascending order + remove any ts < current t
+    pub fn get_next_hits(&self, mut hits: Vec<Self>) -> Vec<Self> {
+        hits.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
+        hits.iter().filter(|a| a.t > self.t).cloned().collect()
+    }
+
+    // same as above but only for the next emelent
+    pub fn get_next_hit(&self, hits: Vec<Self>) -> Self {
+        let mut best = BbHit::new(f64::INFINITY, 0);
+        for hit in hits {
+            if hit.t < best.t && hit.t > self.t {
+                best = hit;
+            }
+        }
+        if best.t == f64::INFINITY {panic!()}
+        best
+    }
+}
+
+use std::ops::{Add, Sub};
+impl Add<f64> for BbHit {
+    type Output = Self;
+
+    #[inline(always)]
+    fn add(self, t: f64) -> Self {
+        Self::new(self.t + t, self.plane)
+    }
+}
+
+impl Sub<f64> for BbHit {
+    type Output = Self;
+
+    #[inline(always)]
+    fn sub(self, t: f64) -> Self {
+        Self::new(self.t - t, self.plane)
+    }
+}

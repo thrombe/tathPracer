@@ -5,8 +5,8 @@ use std::f64::consts::PI;
 use super::vec3d::Vec3d;
 
 use super::world::{World, Camera};
-use super::objects::{Object, Sphere, Plane, Triangle};
-use super::octree::{Octree, OctreeBranch, OctreePos};
+use super::objects::{Object, Sphere, Plane};
+use super::octree::{Octree};
 use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 
@@ -217,7 +217,6 @@ fn octree_test() -> World {
     let mut oct = Octree::new(2.0);
     
 
-    // oct.insert_voxel(Vec3d::new(-0.50, 0.50, 0.50), 2);
     // oct.insert_voxel(Vec3d::new(-0.99, -0.99, -0.99), 2);
     // oct.insert_voxel(Vec3d::new(0.99, 0.99, 0.99), 2);
 

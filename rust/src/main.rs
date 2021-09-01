@@ -28,7 +28,7 @@ pub fn test() {
     use vec3d::Vec3d;
     use ray::Ray;
     use octree::{Octree};
-    use std::mem::size_of;
+    // use std::mem::size_of;
     // println!("{:?}", 5.0/0.0  > 10000.0);
     // println!("{:?}", size_of::<Vec<f64>>());
     let mut oct = Octree::new(2.0);
