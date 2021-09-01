@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use super::vec3d::Vec3d;
-// use super::math;
+use super::math;
 
 use super::material::{Material, Lit};
 use super::ray::{Ray, RayHitfo};
@@ -12,6 +12,7 @@ use super::octree::{Octree, OctreeBranch, OctreePos};
 pub enum Object {
     Sphere(Sphere),
     Plane(Plane),
+    Octree(Octree),
 }
 
 impl Object {
@@ -19,6 +20,7 @@ impl Object {
         match self {
             Object::Sphere(obj) => obj.hit(ray, t_correction),
             Object::Plane(obj) => obj.hit(ray, t_correction),
+            Object::Octree(obj) => obj.hit(ray, t_correction),
         }
     }
 }
@@ -99,64 +101,107 @@ impl Plane {
     }
 }
 
+////////////////////////////////////////////////////
+// struct Aabb {
+//     min: Vec3d,
+//     max: Vec3d,
+// }
+
+// impl Aabb {
+//     fn get_ts(&self, ray: Ray, planes: Vec3d) -> (BbHit, BbHit, BbHit) {
+
+//     }
+// }
+
+#[derive(Clone, Copy, Debug)]
+struct BbHit {
+  t: f64,
+  plane: u8,
+}
+
+impl BbHit {
+    fn new(t: f64, plane: u8)-> Self {
+        Self {t, plane}
+    }
+    fn get_next_hits(&self, mut hits: Vec<Self>) -> Vec<Self> {
+        hits.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
+        hits.iter().filter(|a| a.t > self.t).cloned().collect()
+    }
+    fn get_next_hit(&self, hits: Vec<Self>) -> Self {
+        let mut best = BbHit::new(f64::INFINITY, 0);
+        for hit in hits {
+            if hit.t < best.t && hit.t > self.t {
+                best = hit;
+            }
+        }
+        if best.t == f64::INFINITY {panic!()}
+        best
+    }
+}
+
+use std::ops::{Add, Sub};
+impl Add<f64> for BbHit {
+    type Output = Self;
+
+    #[inline(always)]
+    fn add(self, t: f64) -> Self {
+        Self::new(self.t + t, self.plane)
+    }
+
+}
+
 impl Octree {
+    // does this need t_correction??
+     // it should not need it ig, cuz hits are only considered if it the vexel in front of the corrent voxel(if already in one)
+     // maybe needed for bbox hit
     pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<RayHitfo> {
         // intersect the bb and return if not hit
         // todo
-        
+
         let ray = Ray::new(self.world_to_tree_space(ray.pos), ray.dir);
         let mut planes = OctreePos::get_rub_masks();
         let mut bbox_min = Vec3d::new(-1.0, -1.0, -1.0);
-        let mut dt = {
-            let mut dt = Vec3d::new(1.0/ray.dir.x, 1.0/ray.dir.y, 1.0/ray.dir.z); // f64::Infinity comes up if any is 0.0
+        let (mut dt, mut t0) = {
+            let mut ray = ray.clone();
             // either flip the ray wrt the mid planes (local)
             // or choose the correct bbox edges
             if ray.dir.x < 0.0 {
-                dt.x *= -1.0;
-                bbox_min.x *= -1.0;
+                ray.dir.x *= -1.0;
+                ray.pos.x *= -1.0;
                 planes.0 = !planes.0;
             }
             if ray.dir.y < 0.0 {
-                dt.y *= -1.0;
-                bbox_min.y *= -1.0;
+                ray.dir.y *= -1.0;
+                ray.pos.y *= -1.0;
                 planes.1 = !planes.1;
             }
             if ray.dir.z < 0.0 {
-                dt.z *= -1.0;
-                bbox_min.z *= -1.0;
+                ray.dir.z *= -1.0;
+                ray.pos.z *= -1.0;
                 planes.2 = !planes.2;
             }
-            dt
+            let mut dt = Vec3d::new(1.0/ray.dir.x, 1.0/ray.dir.y, 1.0/ray.dir.z); // f64::Infinity comes up if any is 0.0
+            let mut t0 = Vec3d::new((bbox_min.x-ray.pos.x)*dt.x, (bbox_min.y-ray.pos.y)*dt.y, (bbox_min.z-ray.pos.z)*dt.z);
+            let t0 = (BbHit::new(t0.x, planes.0), BbHit::new(t0.y, planes.1), BbHit::new(t0.z, planes.2));
+            (dt, t0)
         };
-        let mut t0 = Vec3d::new((bbox_min.x-ray.pos.x)/dt.x, (bbox_min.y-ray.pos.y)/dt.y, (bbox_min.z-ray.pos.z)/dt.z);
+        { // return if it dosent hit the octree
+            let t1 = (t0.0+dt.x*2.0, t0.1+dt.y*2.0, t0.2+dt.z*2.0);
+            if math::max_vec(vec![t0.0.t, t0.1.t, t0.2.t]) > math::min_vec(vec![t1.0.t, t1.1.t, t1.2.t]) {return None}
+        }
+        let t = {
+            let mut t = t0.0;
+            if t.t < t0.1.t {t = t0.1}
+            if t.t < t0.2.t {t = t0.2}
+            t
+        };
         
-        fn swap<T: Copy>(a: &mut T, b: &mut T) {
-            let temp = *a;
-            *a = *b;
-            *b = temp;
-        }
-        { // sort in ascending order
-            if t0.x < t0.y {
-                swap(&mut t0.x, &mut t0.y);
-                swap(&mut dt.x, &mut dt.y);
-                swap(&mut planes.0, &mut planes.1)
-            }
-            if t0.y < t0.z {
-                swap(&mut t0.y, &mut t0.z);
-                swap(&mut dt.y, &mut dt.z);
-                swap(&mut planes.1, &mut planes.2)
-            }
-            if t0.x < t0.y {
-                swap(&mut t0.x, &mut t0.y);
-                swap(&mut dt.x, &mut dt.y);
-                swap(&mut planes.0, &mut planes.1)
-            }
-        }
-        let tm = t0 + dt;
+        // println!("t0 {:?}, dt {:?}", t0, dt);
+        // dbg!(t0, dt);
 
         // t value for first voxel is max(t for bbox.min)
         // how? -> well, the ray is in the voxel only if its inside all 3 plane boundaries. so max(t0) ensures this
-        if let Some(hitfo) = self.main_branch.hit(&ray, t0.z, planes.2, planes, &dt, &tm) {
+        if let Some(hitfo) = self.main_branch.hit(&ray, t, t0, &dt) {
            Some(RayHitfo {
             //    t: self.tree_to_world_space_f64(hitfo.t),
                ray: Ray::new(self.tree_to_world_space(hitfo.ray.pos), hitfo.ray.dir),
@@ -168,84 +213,66 @@ impl Octree {
     }
 }
 
-impl OctreeBranch { // t, t_plane, planes, dt, tm
+impl OctreeBranch {
+    // dt is current branch's (t1-t0)/2
+    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d) -> Option<RayHitfo> {
+        // dbg!(self.pos);
+        let tm = (t0.0 + dt.x, t0.1 + dt.y, t0.2 + dt.z);
+        let t1 = (tm.0 + dt.x, tm.1 + dt.y, tm.2 + dt.z);
+        let ts = t.get_next_hits(vec![tm.0, tm.1, tm.2, t1.0, t1.1, t1.2]);
+        let dt_by_2 = *dt*0.5; // for children
 
-    // think about all explanation in this func as if ray.dir.x and y and z > 0
-    // the planes are masks of voxels to right/up/down/whatever. so if we "&" multiple of these, we can constrict where the required voxel is
-    // eg: let 000 represent x, y, z, so 111 & 010 would mean gimme something (out of 111) that has y = 1 (this makes more sense with u8 but im lazy)
-    // note that order of dt, tm and planes is related. i.e planes.0, tm.x, dt.x are for same plane
-    pub fn hit(&self, ray: &Ray, t: f64, t_plane: u8, planes: (u8, u8, u8), dt: &Vec3d, tm: &Vec3d) -> Option<RayHitfo> {
-        // debugging
-        let mut ray2 = ray.clone();//////
-        ray2.new_pos(t);////////
-        println!("{:?}, t {:?}, raypos {:?}", self.pos, t, ray2.pos);//////
-
-        let dt = *dt*0.5; // dt for every sub voxel is half of its parents (since size is half)
-
-        // to choose what subvoxel to enter, we know, it entered crossing t_plane. so it should be a voxel thats to that side of the main voxel
-        // eg: if we cross the left wall(bbox_min), we know the first sub voxel must be touching this wall.
-        // since, by default right, up and forward are chosen, left would mean !t_plane
-        // similarly, to choose what side of the other mid planes the sub voxel lies on, we can compare if the t value for that plane and the main voxel t value
-        let entry_child_mask = !t_plane
-                               & if tm.x < t {planes.0} else {!planes.0}
-                               & if tm.y < t {planes.1} else {!planes.1};
-        // t value for first sub voxel is same as of the main voxel
-        if let Some(hitfo) = self.try_hit_subvoxel(entry_child_mask, ray, t, t_plane, planes, &dt, &(*tm-dt)) {
+        let entry_child_mask = if tm.0.t < t.t {tm.0.plane} else {!tm.0.plane}
+                             & if tm.1.t < t.t {tm.1.plane} else {!tm.1.plane}
+                             & if tm.2.t < t.t {tm.2.plane} else {!tm.2.plane};
+        if let Some(hitfo) = self.try_hit_subvoxel(entry_child_mask, ray, t, t0, dt, &dt_by_2) {
             return Some(hitfo)
         }
-        // its an off voxel or its inner voxels were not hit. so visit next
 
-        // crossing the first mid plane (planes.0)
         let c1: u8;
-        match self.get_next_voxel(entry_child_mask, planes.0, planes) {
+        match self.get_next_voxel(entry_child_mask, ts[0], t0) {
             Some(next) => c1 = next,
             None => return None,
         }
-        //enter c1
-        // this plane is crossed at tm.x, so this becomes the t for next sub_voxel
-        // crossed this plane, so we add the dt.x (cuz the mid plane of that voxel is at that t)
-        if let Some(hitfo) = self.try_hit_subvoxel(c1, ray, tm.x, planes.0, planes, &dt, &Vec3d::new(tm.x + dt.x, tm.y - dt.y, tm.z - dt.z)) {
+        if let Some(hitfo) = self.try_hit_subvoxel(c1, ray, ts[0], t0, dt, &dt_by_2) {
             return Some(hitfo)
         }
 
-        // crossing the second mid plane
         let c2: u8;
-        match self.get_next_voxel(c1, planes.1, planes) {
+        match self.get_next_voxel(c1, ts[1], t0) {
             Some(next) => c2 = next,
             None => return None,
         }
-        //enter c2
-        if let Some(hitfo) = self.try_hit_subvoxel(c2, ray, tm.y, planes.1, planes, &dt, &Vec3d::new(tm.x + dt.x, tm.y + dt.y, tm.z - dt.z)) {
+        if let Some(hitfo) = self.try_hit_subvoxel(c2, ray, ts[1], t0, dt, &dt_by_2) {
             return Some(hitfo)
         }
 
-        // crossing the third plane
         let c3: u8;
-        match self.get_next_voxel(c2, planes.2, planes) {
+        match self.get_next_voxel(c2, ts[2], t0) {
             Some(next) => c3 = next,
             None => return None,
         }
-        //enter c3
-        if let Some(hitfo) = self.try_hit_subvoxel(c3, ray, tm.z, planes.2, planes, &dt, &Vec3d::new(tm.x + dt.x, tm.y + dt.y, tm.z + dt.z)) {
+        if let Some(hitfo) = self.try_hit_subvoxel(c3, ray, ts[2], t0, dt, &dt_by_2) {
             return Some(hitfo)
         }
         None
     }
 
     #[inline(always)]
-    fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: f64, t_plane: u8, planes: (u8, u8, u8), dt: &Vec3d, tm: &Vec3d) -> Option<RayHitfo> {
+    fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d) -> Option<RayHitfo> {
         if child_mask & self.branch_mask > 0 {
             let child = self.get_branch(OctreePos::new(child_mask));
-            if let Some(hitfo) = child.hit(ray, t, t_plane, planes, dt, tm) {
+            let t0 = self.get_t0_for(child_mask, dt, t0);
+            if let Some(hitfo) = child.hit(ray, t, t0, dt_by_2) {
                 return Some(hitfo)
             }
         } else if child_mask & self.child_mask > 0 {
             // its a voxel. so return
-            if t < 0.0 {return None} // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
+            if t.t < 0.0 {return None} // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
             let mut ray = ray.clone();
-            ray.new_pos(t);
+            ray.new_pos(t.t);
             return Some(RayHitfo {
-                t,
+                t: t.t,
                 normal: Vec3d::new(1.0, 1.0, 1.0),
                 material: Material::Lit(Lit {color: Vec3d::zero()}),
                 ray,
@@ -254,9 +281,12 @@ impl OctreeBranch { // t, t_plane, planes, dt, tm
         None
     }
 
+    /// gives the voxel_map when crossing a plane (after crossing the yz plane, we either go to the right voxel, or exit)
+    /// t is only used fot the planes. and not for the t values
     #[inline(always)]
-    fn get_next_voxel(&self, child: u8, plane_mask: u8, planes: (u8, u8, u8)) -> Option<u8> {
-        // gives the voxel_map when crossing a plane (after crossing the yz plane, we either go to the right voxel, or exit)
+    fn get_next_voxel(&self, child: u8, t_passed: BbHit, t: (BbHit, BbHit, BbHit)) -> Option<u8> {
+        let planes = (t.0.plane, t.1.plane, t.2.plane);
+        let plane_mask = t_passed.plane;
         if child & plane_mask > 0 {return None} // child is already in that side (eg -> move right (but im already in right, ig ill exit))
         // we need to know here what plane the plane_mask refers to
         let mut other_masks = {
@@ -270,7 +300,28 @@ impl OctreeBranch { // t, t_plane, planes, dt, tm
         // eg: to more right from LDB, we first find the mask of every voxel with DB and "&" it with plane_mask(R) to the the voxel towards right
         Some(next)
     }
+
+    // dt of parent branch. not child
+    #[inline(always)]
+    fn get_t0_for(&self, child: u8, dt: &Vec3d, t0: (BbHit, BbHit, BbHit)) -> (BbHit, BbHit, BbHit) {
+        let mut t = t0;
+        if child & t.0.plane > 0 { // right
+            t.0.t += dt.x;
+        } else { // left
+        }
+        if child & t.1.plane > 0 { // up
+            t.1.t += dt.y;
+        } else { // down
+        }
+        if child & t.2.plane > 0 { // back
+            t.2.t += dt.z;
+        } else { // fwd
+        }
+        t
+    }
 }
+////////////////////////////////////
+
 
 // refactoring needed for rayhitfo (down)
 

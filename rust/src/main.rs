@@ -18,8 +18,8 @@ mod octree;
 fn main() {
     let now = time::Instant::now();
 
-    // world::run_world();
-    test();
+    world::run_world();
+    // test();
     
     println!("{:?}", now.elapsed());
 }
@@ -33,11 +33,11 @@ pub fn test() {
     // println!("{:?}", size_of::<Vec<f64>>());
     let mut oct = Octree::new(2.0);
     let point = Vec3d::new(-0.125, -0.125, -0.125);
-    oct.insert_voxel(point, 2);
+    oct.insert_voxel(point, 0);
     // println!("{:?}", oct);
     println!("");
-    // let at = Vec3d::new(-0.5, 0.5, 0.5);
-    let at = point;
+    let at = Vec3d::new(-1.5, -0.125, -0.125);
+    // let at = point;
     // let pos = Vec3d::new(0.0, 0.0, 3.503);
     let pos = Vec3d::new(-0.123, -0.126, 3.0);
     let ray = Ray::new(pos, (at-pos).unit());

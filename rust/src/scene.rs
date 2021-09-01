@@ -206,8 +206,8 @@ fn octree_test() -> World {
     let fov = PI/3.0;
     let samples_per_pixel = 10;
     let aperture = 0.0;
-    let cam_position = Vec3d::new(0.03, 0.20, 5.0);
-    let look_at = Vec3d::new(-0.50, 0.50, 0.50);
+    let cam_position = Vec3d::new(3.0, 3.0, 3.0);
+    let look_at = Vec3d::new(0.0, 0.0, 0.0);
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
@@ -217,13 +217,15 @@ fn octree_test() -> World {
     let mut oct = Octree::new(2.0);
     
 
-    oct.insert_voxel(Vec3d::new(-0.50, 0.50, 0.50), 2);
+    // oct.insert_voxel(Vec3d::new(-0.50, 0.50, 0.50), 2);
+    // oct.insert_voxel(Vec3d::new(-0.99, -0.99, -0.99), 2);
+    // oct.insert_voxel(Vec3d::new(0.99, 0.99, 0.99), 2);
 
-    // let mut rng = rand::thread_rng();
-    // let random = Uniform::new(-1.0, 1.0);
-    // for _ in 0..1 {
-    //     oct.insert_voxel(Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng)), 0);
-    // }
+    let mut rng = rand::thread_rng();
+    let random = Uniform::new(-1.0, 1.0);
+    for _ in 0..100000 {
+        oct.insert_voxel(Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng)), 7);
+    }
     
     world.objects.push(Object::Octree(oct));
     world
