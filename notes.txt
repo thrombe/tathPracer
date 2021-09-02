@@ -1,7 +1,5 @@
 
 todo/ideas:
-  /. ram probs due to multi-core stuff
-    /. this isnt too much of a problem as the size is max 8*5k*5k*(1*8 f64) bytes -> 1.5 GB or *= 3/8 for (3*1 u8)
   . use f64::infinity or whatever consts
   . multiple samples if material is lambertian ????
   . multi-colored materials (all types?)
@@ -23,6 +21,8 @@ todo/ideas:
     . some probability that it passes/interacts depending on t
     . if interacts, pick some t in the range
     . let it bounce in random direction
+    . use voxels? - more ideas in "octree" below
+  . 3d fractals using distance estimate funcs for mandlebulb etc
   . a portal
     . maybe any shape + coupled objects
       . different ways the ray comes out
@@ -30,7 +30,7 @@ todo/ideas:
         . direction
         . color
     . how do i make the objects teleport through these?
-  . bounding boxes using 2 vectors
+  . aabbs for every object + put them in octrees
   . triangle meshes
     . how do i store the vertices? just a vec wouldnt be very efficient
     . maybe mesh bounding box, + some structure with bounding boxes of groups of triangles
@@ -39,13 +39,12 @@ todo/ideas:
       . will also have to keep a matrix to rotate the ray dir correctly
       . this isnt very efficient for static scenes tho cuz we dont need to move objects often
     . maybe aabb thing for triangels and oct-tree for rest?
-    . oct-tree 
-      . this way, i can have a lot of objects without too much probs
+    . oct-tree
+      /. this way, i can have a lot of objects without too much probs
       . i can use marching cubes to create terrain and render it on fly (dont need to store it)
         . if storage is a big prob, then create it while tracing rays, tho this will be slow af
-        . mayeb i can cache a few cubes so that we only create the cube once (per thread) and reuse it for all rays in that pixel (group of pixels)
+        . mayebe i can cache a few cubes so that we only create the cube once (per thread) and reuse it for all rays in that pixel (group of pixels)
       . how do i store triangles in it tho?
-        /. VERY COMPLEX IT SEEMS
         \. triangles can be huge and will have to exist in multiple cubes
           \. sorting is kinda easy once we have the cubes - just use the bounding box to add it to every cube it intersects with
         \. or triangles can be stored in oct-tree using some index in array of triangles
@@ -61,17 +60,37 @@ todo/ideas:
           . triangle meshes are closed usually, so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
             . the interior can have big voxels
             . maybe voxels can be filled like rasterisation. move a point along the area of triangle and put a voxel there
-        . voxels can be efficiently stored in an octree
-          . enum u8 with 1bit is 1 subvoxel in it, if it contains more levels then it has u8 in it
-            \. 1GB -> smallest leaf is 1mm, 128*128 metre³ volume (completely full octree)
-              \. but nor info? like normals and colors and materials
-            . how materials + color?
-              \. (nope dosent work like that) empty enums with each voxel? how tf would this work. no extra space is used, but then how is it even possible?
-              \. store color in the biggest voxel of all same type, same with voxel type
-                \. im already doing sparse compression thing tho
-              . store all unique materials and colors (seperately) in vecs and have voxels(parent branch, not leaves) 
-                contain a u32/u16(68k possibilities) index value to this
-              . or have each branch store the materials of their children
+  . octree
+    . if multithreading gives trouble with arc and stuff, try the share/sync trait
+    . see ram stats + how crazy can i go with it.
+      . can i load minecraft maps in it?
+    . this seems slowish, profiling needed
+      . try inlining a few funcs from octree
+      /. check if normals are slowing things down or materials
+      /. try &material instead of cloning
+      /. it was 9 seconds (now 51 seconds) before the custom materials things
+        /. THE CREATION OF OCTREE TAKES 41 SEC!!
+          /. lol simple bug
+        /. lit material
+    . ray trace till custom depth
+      . Option<usize> - None would mean ignore depth limit
+      . change depth as t increases maybe?
+    . i dont think Dielectric material would work good here (not yet atleast)
+      . maybe another "volumetric_mask" per voxel?
+        . material_mask can go u16
+        . these dont require normals
+          . maybe they do, glass can have a normal, and while going out, you flip this normal
+            . dosent sound too accurate, anything better i can do?
+            . like use dt for direction change
+            . or maybe dt and the cube infered normal + flipped normal
+          . they can either be randomised (for fog stuff), or inferred from the t_plane + ray.dir or something
+      . so it can have a different reaction when leaving voxel
+        . leaving voxel - check ray pos and use t1
+        . when leaving the try_hit_subvoxel, it can call something else maybe
+    . can i make voxels into cubes? (the normals stuff i mean)
+      . should i? - just adding a custom cube object in octree seems good enough
+    . compression
+      . voxels with no normals and default materials can be considered mergable with voxels that have materials and normals (if not visible)
   . more shapes
     . rays/lines (will be cool to view rays)
       . how? these are a bit too thin
@@ -87,6 +106,7 @@ todo/ideas:
   . what would happen if i just use 4d vectors and 4d objects (consider a teseract)
     rotate the needed vectors with rotation matrices and and try to render it with similar tech as 3d
     . 3d images? (assigning colors to 3d pixels) can i do anything with this?
+      . average the colors down to 2d
     . 2d images?
 
 remember:

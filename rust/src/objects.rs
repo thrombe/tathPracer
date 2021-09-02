@@ -154,7 +154,7 @@ impl Octree {
 
         // t value for first voxel is max(t for bbox.min)
         // how? -> well, the ray is in the voxel only if its inside all 3 plane boundaries. so max(t0) ensures this
-        if let Some(hitfo) = self.main_branch.hit(&ray, t, t0, &dt) {
+        if let Some(hitfo) = self.main_branch.hit(&ray, t, t0, &dt, t_correction) {
            Some(RayHitfo {
                ray: Ray::new(self.tree_to_world_space(hitfo.0.ray.pos), hitfo.0.ray.dir),
                material: self.materials[hitfo.1 as usize].clone(),
@@ -172,7 +172,7 @@ impl OctreeBranch {
     // eg: let 000 represent x, y, z, so 111 & 010 would mean gimme something (out of 111) that has y = 1 (this makes more sense with u8 but im lazy)
 
     // dt is current branch's (t1-t0)/2
-    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d) -> Option<(RayHitfo, u32)> {
+    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64) -> Option<(RayHitfo, u32)> {
         // dbg!(self.pos);
 
         // since the planes are parallel and seperated by a constant amount, we just need some addition
@@ -188,7 +188,7 @@ impl OctreeBranch {
         // now try and visit every child in this branch which could be hit (in order of ray intersection)
         // at most 4 sub-voxels can be hit
         
-        if let Some(hitfo) = self.try_hit_subvoxel(entry_child_mask, ray, t, t0, dt, &dt_by_2) {
+        if let Some(hitfo) = self.try_hit_subvoxel(entry_child_mask, ray, t, t0, dt, &dt_by_2, t_correction) {
             return Some(hitfo)
         }
         
@@ -202,7 +202,7 @@ impl OctreeBranch {
                 Some(next) => child = next,
                 None => return None, // the ray exited this voxel(this branch)
             }
-            if let Some(hitfo) = self.try_hit_subvoxel(child, ray, ts[i], t0, dt, &dt_by_2) {
+            if let Some(hitfo) = self.try_hit_subvoxel(child, ray, ts[i], t0, dt, &dt_by_2, t_correction) {
                 return Some(hitfo)
             }
         }
@@ -210,15 +210,15 @@ impl OctreeBranch {
     }
 
     #[inline(always)]
-    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d) -> Option<(RayHitfo, u32)> {
+    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64) -> Option<(RayHitfo, u32)> {
         if child_mask & self.branch_mask > 0 { // check if the voxel is a branch
-            let child = self.get_branch(OctreePos::new(child_mask));
+            let child = self.get_branch(child_mask);
             let t0 = self.get_t0_for(child_mask, dt, t0);
-            if let Some(hitfo) = child.hit(ray, t, t0, dt_by_2) {
+            if let Some(hitfo) = child.hit(ray, t, t0, dt_by_2, t_correction) {
                 return Some(hitfo)
             }
         } else if child_mask & self.child_mask > 0 { // check if leaf
-            if t.t < 0.0 {return None} // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
+            if t.t < t_correction {return None} // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
             let mut ray = ray.clone();
             ray.new_pos(t.t);
             return Some((RayHitfo {

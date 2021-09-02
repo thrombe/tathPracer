@@ -1,5 +1,6 @@
 
 // use std::sync::{Arc, RwLock};
+// if multithreading gives trouble with arc and stuff, try the share/sync trait
 
 use super::vec3d::Vec3d;
 use super::material::{Material, Lit};
@@ -47,6 +48,7 @@ impl Octree {
     /// deletes empty branches, deletes unnecessary voxels
     pub fn compress_sparseness(&mut self) {
         // check normals too!!
+        // voxels with no normals and default materials can be considered mergable with voxels that have materials and normals (if not visible)
         todo!();
     }
 }
@@ -82,8 +84,7 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
         OctreePos::new(pos)
     }
     
-    fn set_voxel(&mut self, pos: OctreePos, material_index: u32, normal: Option<Vec3d>) {
-        let pos_mask = pos.get_mask();
+    fn set_voxel(&mut self, pos_mask: u8, material_index: u32, normal: Option<Vec3d>) {
         self.child_mask = self.child_mask | pos_mask;
         
         match normal {
@@ -117,21 +118,30 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
 
     fn insert_voxel_from_point(&mut self, point: Vec3d, depth: usize, material_index: u32, normal: Option<Vec3d>) {
         let pos = self.get_pos_from_point(&point);
+        let pos_mask = pos.get_mask();
         // println!("{:?}", pos);
         if depth == 0 {
-            self.set_voxel(pos, material_index, normal);
+            self.set_voxel(pos_mask, material_index, normal);
             return
         }
-        let branch = self.add_branch(pos, material_index, normal);
+        let branch = self.add_or_get_branch(pos_mask, material_index, normal);
         branch.insert_voxel_from_point((point-branch.get_coord())*2.0, depth-1, material_index, normal);
     }
     
-    fn add_branch(&mut self, pos: OctreePos, material_index: u32, normal: Option<Vec3d>) -> &mut Self {
-        self.set_voxel(pos, material_index, normal);
-        let pos_mask = pos.get_mask();
-        if (self.branch_mask & pos_mask) > 0 {return self.get_branch_mut(pos)}
+    fn add_or_get_branch(&mut self, pos_mask: u8, material_index: u32, normal: Option<Vec3d>) -> &mut Self {
+        if (self.branch_mask & pos_mask) > 0 {return self.get_branch_mut(pos_mask)}
+        // if this isnt a branch
+        self.add_branch(pos_mask, material_index, normal)
+    }
+
+    fn add_branch(&mut self, pos_mask: u8, material_index: u32, normal: Option<Vec3d>) -> &mut Self {
+        // create a new voxel
+        self.set_voxel(pos_mask, material_index, normal);
+
+        // create a new branch
         self.branch_mask = self.branch_mask | pos_mask;
-        let chilranch = Self::new(pos);
+        let chilranch = Self::new(OctreePos::new(pos_mask));
+
         // insert branch at correct index
         let index = self.get_info_index(self.branch_mask, pos_mask);
         self.chilranches.insert(index, chilranch);
@@ -145,21 +155,23 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
         self.normals.insert(index, normal);
     }
 
-    pub fn get_branch_mut(&mut self, pos: OctreePos) -> &mut Self {
-        let index = self.get_info_index(self.branch_mask, pos.get_mask());
+    pub fn get_branch_mut(&mut self, pos_mask: u8) -> &mut Self {
+        let index = self.get_info_index(self.branch_mask, pos_mask);
         &mut self.chilranches[index]
     }
     
-    pub fn get_branch(&self, pos: OctreePos) -> &Self {
-        let index = self.get_info_index(self.branch_mask, pos.get_mask());
+    pub fn get_branch(&self, pos_mask: u8) -> &Self {
+        let index = self.get_info_index(self.branch_mask, pos_mask);
         &self.chilranches[index]
     }
 
+    #[inline(always)]
     pub fn get_normal(&self, pos_mask: u8) -> &Vec3d {
         &self.normals[self.get_info_index(self.normal_mask, pos_mask)]
     }
 
     /// assuming that there is info for this voxel
+    #[inline(always)]
     pub fn get_info_index(&self, info_mask: u8, pos_mask: u8) -> usize {
         let mut count = 0;
         let mut mask = 1;
