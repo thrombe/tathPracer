@@ -13,11 +13,13 @@ pub struct Octree {
     pub scale_factor: f64,
     pub main_branch: OctreeBranch,
     pub materials: Vec<Material>, // material at 0 index should be some default material for undefined stuff
+    pub lod_depth_limit: Option<u16>,
 }
 
 impl Octree {
-    pub fn new(size: f64) -> Self {
+    pub fn new(size: f64, lod_depth_limit: Option<u16>) -> Self {
         Self {
+            lod_depth_limit,
             half_size: size/2.0,
             scale_factor: 2.0/size,
             main_branch: OctreeBranch::new(OctreePos::Main),
@@ -37,10 +39,12 @@ impl Octree {
         self.main_branch.insert_voxel_from_point(point, depth, material_index, normal);
     }
 
+    #[inline(always)]
     pub fn world_to_tree_space(&self, pos: Vec3d) -> Vec3d {
         pos*self.scale_factor
     }
 
+    #[inline(always)]
     pub fn tree_to_world_space(&self, pos: Vec3d) -> Vec3d {
         pos*self.half_size
     }
@@ -149,17 +153,20 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
     }
 
     // find where the normal should go (index), and correctly set/modify normals and indices
+    #[inline(always)]
     fn insert_normal(&mut self, normal: Vec3d, pos_mask: u8) {
         self.normal_mask = self.normal_mask | pos_mask;
         let index = self.get_info_index(self.normal_mask, pos_mask);
         self.normals.insert(index, normal);
     }
 
+    #[inline(always)]
     pub fn get_branch_mut(&mut self, pos_mask: u8) -> &mut Self {
         let index = self.get_info_index(self.branch_mask, pos_mask);
         &mut self.chilranches[index]
     }
     
+    #[inline(always)]
     pub fn get_branch(&self, pos_mask: u8) -> &Self {
         let index = self.get_info_index(self.branch_mask, pos_mask);
         &self.chilranches[index]
@@ -209,6 +216,7 @@ impl OctreePos {
         }
     }
 
+    #[inline]
     pub fn get_mask(&self) -> u8 {
         match self {
             OctreePos::RUB => 0b_00000001,
@@ -223,6 +231,7 @@ impl OctreePos {
         }
     }
     
+    #[inline(always)]
     pub fn get_rub_masks() -> (u8, u8, u8) {
         (
         0b_10011001, // R - 153 or ! 102
@@ -239,17 +248,20 @@ pub struct BbHit { // bounding box hit
 }
 
 impl BbHit {
+    #[inline(always)]
     pub fn new(t: f64, plane: u8)-> Self {
         Self {t, plane}
     }
 
     // sort all ts in ascending order + remove any ts < current t
+    #[inline(always)]
     pub fn get_next_hits(&self, mut hits: Vec<Self>) -> Vec<Self> {
         hits.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
         hits.iter().filter(|a| a.t > self.t).cloned().collect()
     }
 
     // same as above but only for the next emelent
+    #[inline(always)]
     pub fn get_next_hit(&self, hits: Vec<Self>) -> Self {
         let mut best = BbHit::new(f64::INFINITY, 0);
         for hit in hits {

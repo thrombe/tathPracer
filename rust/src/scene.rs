@@ -206,7 +206,7 @@ fn octree_test() -> World {
     let fov = PI/3.0;
     let samples_per_pixel = 10;
     let aperture = 0.0;
-    let cam_position = Vec3d::new(3.0, 3.0, 3.0);
+    let cam_position = Vec3d::new(1.3, 0.7, 4.0);
     let look_at = Vec3d::new(0.0, 0.0, 0.0);
 
     let mut world = World {
@@ -214,9 +214,10 @@ fn octree_test() -> World {
         objects: Vec::<Object>::new(),
     };
 
-    // this seems slowish, profiling needed
+    // READ NOTES - octree
+    // check if reflections work good within octree
 
-    let mut oct = Octree::new(2.0);
+    let mut oct = Octree::new(2.0, None);
     
     let material = Material::Lambertian(Lambertian {
         color: Vec3d::new(0.7, 0.4, 0.7),

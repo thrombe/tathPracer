@@ -61,19 +61,14 @@ todo/ideas:
             . the interior can have big voxels
             . maybe voxels can be filled like rasterisation. move a point along the area of triangle and put a voxel there
   . octree
+    . a kind of problemish is there. inserting a smol voxel inside a earlier big voxel kinda makes the bigger one not visible in images
+      . this may be desirable tho, cuz this way, we can create models with different colors for bigger voxels
+        like, recursively voxelising something in greater and greater detail with maybe different colors for each level
     . if multithreading gives trouble with arc and stuff, try the share/sync trait
     . see ram stats + how crazy can i go with it.
       . can i load minecraft maps in it?
     . this seems slowish, profiling needed
-      . try inlining a few funcs from octree
-      /. check if normals are slowing things down or materials
-      /. try &material instead of cloning
-      /. it was 9 seconds (now 51 seconds) before the custom materials things
-        /. THE CREATION OF OCTREE TAKES 41 SEC!!
-          /. lol simple bug
-        /. lit material
     . ray trace till custom depth
-      . Option<usize> - None would mean ignore depth limit
       . change depth as t increases maybe?
     . i dont think Dielectric material would work good here (not yet atleast)
       . maybe another "volumetric_mask" per voxel?
