@@ -234,9 +234,9 @@ impl OctreePos {
     #[inline(always)]
     pub fn get_rub_masks() -> (u8, u8, u8) {
         (
-        0b_10011001, // R - 153 or ! 102
-        0b_00001111, // U - 15 or ! 240
-        0b_11000011, // B - 195 or ! 60
+            0b_10011001, // R - 153 or ! 102
+            0b_00001111, // U - 15 or ! 240
+            0b_11000011, // B - 195 or ! 60
         )
     }
 }
@@ -271,6 +271,21 @@ impl BbHit {
         }
         if best.t == f64::INFINITY {panic!()}
         best
+    }
+
+    /// gives the normal of self.plane , direction is outside cube (dosent work when inside the cube (for now atleast))
+    /// this depends on how the octree.hit handles planes
+    #[inline(always)]
+    pub fn get_plane_normal(&self) -> Vec3d {
+        match self.plane {
+            0b_10011001 => Vec3d::new(-1.0, 0.0, 0.0), // r -> normal towards left
+            0b_01100110 => Vec3d::new(1.0, 0.0, 0.0), // l
+            0b_00001111 => Vec3d::new(0.0, -1.0, 0.0), // u
+            0b_11110000 => Vec3d::new(0.0, 1.0, 0.0), // d
+            0b_11000011 => Vec3d::new(0.0, 0.0, -1.0), // b
+            0b_00111100 => Vec3d::new(0.0, 0.0, 1.0), // f
+            _ => panic!(),
+        }
     }
 }
 

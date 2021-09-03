@@ -1,4 +1,10 @@
 
+plan (priority - only a few items here plz):
+  . make the world into an octree - so objects inside this octree
+  /. if voxels have no normal, infer it from the t and t_plane (so it acts like a square)
+  . is the function for world(relative to main octree) coords of voxels useful? - then make it
+  . triangle mesh importing and tracing (later can be voxelised)
+
 todo/ideas:
   . use f64::infinity or whatever consts
   . multiple samples if material is lambertian ????
@@ -8,6 +14,9 @@ todo/ideas:
     . color as func of angle with normal?
   . better fresnel or whatever
     . instead of randomising reflection and refraction, a part of them should bounce and a part should refract
+  . make this do the termiRen stuff too
+    . dosent seem to difficult - just modify the world struct a bit
+  . look into signed distance fields
   . more materials
     . textures
       . custom textured skybox - just another sphere??
@@ -59,17 +68,35 @@ todo/ideas:
         . how voxelise?
           . triangle meshes are closed usually, so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
             . the interior can have big voxels
-            . maybe voxels can be filled like rasterisation. move a point along the area of triangle and put a voxel there
+          . maybe voxels can be filled like rasterisation. move a point along the area of triangle and put a voxel there
+            . for more accurate things, insert the point a few more levels deep and check if it lies closeish to the centre or lies along boundaries
+            . if it lies along the boundaries, then we can either ignore the voxel or check a few more things
+              . the normsls of triangles usually point outside, so maybe this can be used to decide if a voxel should go in or not
+          . flood-fill the outside and then invert it
+          . triangle voxelise
+            . find bb and sample 8 points within a voxel to decide if it should be filled
+            . either every voxel.in this can be checked (recursive) (cuz simpler)
+              or only check (recursive) that actually intersect
   . octree
     . a kind of problemish is there. inserting a smol voxel inside a earlier big voxel kinda makes the bigger one not visible in images
       . this may be desirable tho, cuz this way, we can create models with different colors for bigger voxels
         like, recursively voxelising something in greater and greater detail with maybe different colors for each level
     . if multithreading gives trouble with arc and stuff, try the share/sync trait
-    . see ram stats + how crazy can i go with it.
-      . can i load minecraft maps in it?
     . this seems slowish, profiling needed
-    . ray trace till custom depth
-      . change depth as t increases maybe?
+    . see ram stats + how crazy can i go with it.
+      . deepsize on github (idk if crate)
+      . as of 2/9/21, it uses about 85MB total (RES memory from top command)
+        . out of which around 55MB should be image buffers
+        . 100k voxel inputs with normals
+      . can i load minecraft maps in it?
+    . voxel normals
+      . many voxels can have same normal (big triangle), can i do something to save space here?
+        . like is no normal, check parents normal recursively
+      /. can i make voxels into cubes? (the normals stuff i mean)
+        /. should i? - just adding a custom cube object in octree seems good enough
+        /. this may mean that i dont need to store normals for these, and this would be nice for space reasons
+        /. this will be useful for minecraft like things tho, so it reduces sizes by a heck lot
+    . change ray cast depth as t increases maybe?
     . i dont think Dielectric material would work good here (not yet atleast)
       . maybe another "volumetric_mask" per voxel?
         . material_mask can go u16
@@ -82,8 +109,6 @@ todo/ideas:
       . so it can have a different reaction when leaving voxel
         . leaving voxel - check ray pos and use t1
         . when leaving the try_hit_subvoxel, it can call something else maybe
-    . can i make voxels into cubes? (the normals stuff i mean)
-      . should i? - just adding a custom cube object in octree seems good enough
     . compression
       . voxels with no normals and default materials can be considered mergable with voxels that have materials and normals (if not visible)
   . more shapes

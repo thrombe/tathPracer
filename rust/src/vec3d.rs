@@ -12,10 +12,12 @@ pub struct Vec3d {
 
 impl Vec3d {
 
+    #[inline(always)]
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self {x, y, z}
     }
 
+    #[inline(always)]
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0)
     }

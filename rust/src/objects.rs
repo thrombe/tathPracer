@@ -225,7 +225,13 @@ impl OctreeBranch {
             ray.new_pos(t.t);
             return Some((RayHitfo {
                 t: t.t,
-                normal: self.get_normal(child_mask).clone(),
+                normal: {
+                    if self.normal_mask & child_mask > 0 {
+                        self.get_normal(child_mask).clone()
+                    } else {
+                        t.get_plane_normal()
+                    }
+                },
                 material: Material::Lit(Lit {color: Vec3d::zero()}),
                 ray,
             }, self.materials[self.get_info_index(self.child_mask, child_mask)]))
@@ -339,7 +345,7 @@ impl Triangle {
 
 pub struct TriangleMesh {
     vertices: Arc/* or Box?(why rc for something inside a struct)*/<Vec<Vec3d>>, // meshes inside meshes??
-    triangles: Arc<Vec<Triangle>>,
+    triangles: Arc<Vec<Triangle>>, // NO NEED OF ARCS!! YAY
     // bounding_box: (Vec3d, Vec3d), // min, max // axis aligned
     position: Vec3d, // we can use this to move objects without editing all coords (notes)
     bounding_box: (Vec3d, Vec3d, Vec3d, Vec3d), // position of a corner, xdir, ydir, zdir // not axis aligned // we can get axis aligned using this

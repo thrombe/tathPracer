@@ -204,9 +204,9 @@ fn octree_test() -> World {
     let width = 720;
     let height = 480;
     let fov = PI/3.0;
-    let samples_per_pixel = 10;
+    let samples_per_pixel = 100;
     let aperture = 0.0;
-    let cam_position = Vec3d::new(1.3, 0.7, 4.0);
+    let cam_position = Vec3d::new(-1.3, 0.7, -4.0);
     let look_at = Vec3d::new(0.0, 0.0, 0.0);
 
     let mut world = World {
@@ -224,20 +224,26 @@ fn octree_test() -> World {
     });
     let material_index = oct.add_material(material);
 
+    let material = Material::Metal(Metal {
+        color: Vec3d::new(0.7, 0.4, 0.4),
+        fuzz: 0.0,
+    });
+    let material_index2 = oct.add_material(material);
+
     let point = Vec3d::new(-0.99, -0.99, -0.99);
     let normal = point.clone();
-    oct.insert_voxel(point, 0, material_index, Some(normal));
+    oct.insert_voxel(point, 0, material_index2, None);//Some(normal));
     let point = Vec3d::new(0.99, 0.99, 0.99);
     let normal = point.clone();
-    oct.insert_voxel(point, 0, material_index, Some(normal));
+    oct.insert_voxel(point, 0, material_index, None);//Some(normal));
 
-    let mut rng = rand::thread_rng();
-    let random = Uniform::new(-1.0, 1.0);
-    for _ in 0..100000 {
-        let point = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng));
-        let normal = point.clone().unit();
-        oct.insert_voxel(point, 7, 0, Some(normal));
-    }
+    // let mut rng = rand::thread_rng();
+    // let random = Uniform::new(-1.0, 1.0);
+    // for _ in 0..500 {
+    //     let point = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng));
+    //     let normal = point.clone().unit();
+    //     oct.insert_voxel(point, 4, material_index, Some(normal));
+    // }
     
     world.objects.push(Object::Octree(oct));
     world
