@@ -137,9 +137,11 @@ impl Octree {
             let t0 = (BbHit::new(t0.x, planes.0), BbHit::new(t0.y, planes.1), BbHit::new(t0.z, planes.2));
             (dt, t0)
         };
-        { // return if it dosent hit the octree
+        { // return if it dosent hit the octree or octree behind the ray origin
             let t1 = (t0.0+dt.x*2.0, t0.1+dt.y*2.0, t0.2+dt.z*2.0);
-            if math::max_vec(vec![t0.0.t, t0.1.t, t0.2.t]) > math::min_vec(vec![t1.0.t, t1.1.t, t1.2.t]) {return None}
+            let min_t1 = math::min_vec(vec![t1.0.t, t1.1.t, t1.2.t]);
+            if math::max_vec(vec![t0.0.t, t0.1.t, t0.2.t]) > min_t1 {return None}
+            if min_t1 < 0.0 {return None} // this means both max_t0 and min_t1 are -ve, so the octree must be brhind the ray
         }
 
         let t = { // for first hit, t = max(t0)

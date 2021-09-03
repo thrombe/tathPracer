@@ -1,7 +1,7 @@
 
 plan (priority - only a few items here plz):
   . make the world into an octree - so objects inside this octree
-  /. if voxels have no normal, infer it from the t and t_plane (so it acts like a square)
+  . how do i do dielectric voxels?
   . is the function for world(relative to main octree) coords of voxels useful? - then make it
   . triangle mesh importing and tracing (later can be voxelised)
 
@@ -92,10 +92,6 @@ todo/ideas:
     . voxel normals
       . many voxels can have same normal (big triangle), can i do something to save space here?
         . like is no normal, check parents normal recursively
-      /. can i make voxels into cubes? (the normals stuff i mean)
-        /. should i? - just adding a custom cube object in octree seems good enough
-        /. this may mean that i dont need to store normals for these, and this would be nice for space reasons
-        /. this will be useful for minecraft like things tho, so it reduces sizes by a heck lot
     . change ray cast depth as t increases maybe?
     . i dont think Dielectric material would work good here (not yet atleast)
       . maybe another "volumetric_mask" per voxel?
