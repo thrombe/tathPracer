@@ -157,10 +157,14 @@ impl Octree {
             if t.t < t0.2.t {t = t0.2}
             t
         };
-        
-        // println!("t0 {:?}, dt {:?}", t0, dt);
-        // dbg!(t0, dt);
 
+        // {
+        //     if t.t == f64::INFINITY {
+        //         dbg!(t1, t0, t, dt, max_t0, min_t1, max_t0 > min_t1);
+        //         panic!();
+        //     }
+        // }
+        
         // t value for first voxel is max(t for bbox.min)
         // how? -> well, the ray is in the voxel only if its inside all 3 plane boundaries. so max(t0) ensures this
         if let Some(hitfo) = self.main_branch.hit(&ray, t, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1)) { // +1 to get this depth and insert depth in same level
@@ -181,14 +185,18 @@ impl OctreeBranch {
     // eg: let 000 represent x, y, z, so 111 & 010 would mean gimme something (out of 111) that has y = 1 (this makes more sense with u8 but im lazy)
 
     // dt is current branch's (t1-t0)/2
-    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>) -> Option<(RayHitfo, u32)> {
+    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>) -> Option<(RayHitfo, u16)> {
         // dbg!(self.pos);
 
         depth = depth.map(|x| x-1);        
 
         // since the planes are parallel and seperated by a constant amount, we just need some addition
         // to figure out the next t-values
-        let tm = (t0.0 + dt.x, t0.1 + dt.y, t0.2 + dt.z);
+        let tm = (t0.0 + dt.x, t0.1 + dt.y, t0.2 + dt.z); // -ve inf + inf = nan -> set to -ve inf or inf?
+        
+        // the next t-values can be found just* by sorting the ts in ascending order, since the ray hits the voxel in that order 
+        let t1 = (tm.0 + dt.x, tm.1 + dt.y, tm.2 + dt.z);
+        let ts = t.get_next_hits(vec![tm.0, tm.1, tm.2, t1.0, t1.1, t1.2]);
         
         let dt_by_2 = *dt*0.5; // dt for every sub voxel is half of its parents (since size is half)
         
@@ -199,21 +207,17 @@ impl OctreeBranch {
         // now try and visit every child in this branch which could be hit (in order of ray intersection)
         // at most 4 sub-voxels can be hit
         
-        if let Some(hitfo) = self.try_hit_subvoxel(entry_child_mask, ray, t, t0, dt, &dt_by_2, t_correction, depth) {
+        if let Some(hitfo) = self.try_hit_subvoxel(entry_child_mask, ray, t, ts[0], t0, dt, &dt_by_2, t_correction, depth) {
             return Some(hitfo)
         }
         
-        // the next t-values can be found just* by sorting the ts in ascending order, since the ray hits the voxel in that order 
-        let t1 = (tm.0 + dt.x, tm.1 + dt.y, tm.2 + dt.z);
-        let ts = t.get_next_hits(vec![tm.0, tm.1, tm.2, t1.0, t1.1, t1.2]);
-
         let mut child = entry_child_mask;
         for i in 0..3 {
             match self.get_next_voxel(child, ts[i], t0) {
                 Some(next) => child = next,
                 None => return None, // the ray exited this voxel(this branch)
             }
-            if let Some(hitfo) = self.try_hit_subvoxel(child, ray, ts[i], t0, dt, &dt_by_2, t_correction, depth) {
+            if let Some(hitfo) = self.try_hit_subvoxel(child, ray, ts[i], ts[i+1], t0, dt, &dt_by_2, t_correction, depth) {
                 return Some(hitfo)
             }
         }
@@ -221,7 +225,7 @@ impl OctreeBranch {
     }
 
     #[inline(always)]
-    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>) -> Option<(RayHitfo, u32)> {
+    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, ts_p1: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>) -> Option<(RayHitfo, u16)> {
         if depth != Some(0) && child_mask & self.branch_mask > 0 { // check if the voxel is a branch
             let child = self.get_branch(child_mask);
             let t0 = self.get_t0_for(child_mask, dt, t0);
@@ -229,7 +233,26 @@ impl OctreeBranch {
                 return Some(hitfo)
             }
         } else if child_mask & self.child_mask > 0 { // check if leaf
-            if t.t < t_correction {return None} // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
+            if t.t < t_correction { // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
+                if self.volumetric_mask & child_mask > 0 && ts_p1.t > t_correction { // this means ray originates from inside a volumetric voxel thing
+                    let mut ray = ray.clone();
+                    ray.new_pos(ts_p1.t);
+                    return Some((RayHitfo {
+                        t: ts_p1.t,
+                        normal: {
+                            if self.normal_mask & child_mask > 0 {
+                                self.get_normal(child_mask).clone()*(-1.0)
+                            } else {
+                                ts_p1.get_plane_normal()*(-1.0)
+                            }
+                        },
+                        material: Material::Lit(Lit {color: Vec3d::zero()}),
+                        ray,
+                    }, self.materials[self.get_info_index(self.child_mask, child_mask)]))        
+                } else {
+                    return None
+                }    
+            }
             let mut ray = ray.clone();
             ray.new_pos(t.t);
             return Some((RayHitfo {
