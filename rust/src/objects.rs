@@ -133,14 +133,21 @@ impl Octree {
                 planes.2 = !planes.2;
             }
             let dt = Vec3d::new(1.0/ray.dir.x, 1.0/ray.dir.y, 1.0/ray.dir.z); // f64::Infinity comes up if any is 0.0
-            let t0 = Vec3d::new((bbox_min.x-ray.pos.x)*dt.x, (bbox_min.y-ray.pos.y)*dt.y, (bbox_min.z-ray.pos.z)*dt.z);
+            let mut t0 = Vec3d::new((bbox_min.x-ray.pos.x)*dt.x, (bbox_min.y-ray.pos.y)*dt.y, (bbox_min.z-ray.pos.z)*dt.z);
+            // inf is okay, nut nan is a problem. here, the nan is cuz 0*inf, so we can have 0 instead since this means ray.pos is on the line (prev line)
+            // -ve inf is also a prob. -ve inf + inf -> nan. turning -ve inf to inf prevents the nan and also works out for possible good rays cuz max(t0) == inf is never a good ray
+            t0.x = if t0.x.is_nan() {0.0} else if t0.x == f64::NEG_INFINITY {f64::INFINITY} else {t0.x};
+            t0.y = if t0.y.is_nan() {0.0} else if t0.y == f64::NEG_INFINITY {f64::INFINITY} else {t0.y};
+            t0.z = if t0.z.is_nan() {0.0} else if t0.z == f64::NEG_INFINITY {f64::INFINITY} else {t0.z};
+
             let t0 = (BbHit::new(t0.x, planes.0), BbHit::new(t0.y, planes.1), BbHit::new(t0.z, planes.2));
             (dt, t0)
         };
         { // return if it dosent hit the octree or octree behind the ray origin
             let t1 = (t0.0+dt.x*2.0, t0.1+dt.y*2.0, t0.2+dt.z*2.0);
             let min_t1 = math::min_vec(vec![t1.0.t, t1.1.t, t1.2.t]);
-            if math::max_vec(vec![t0.0.t, t0.1.t, t0.2.t]) > min_t1 {return None}
+            let max_t0 = math::max_vec(vec![t0.0.t, t0.1.t, t0.2.t]);
+            if max_t0 >= min_t1 {return None}
             if min_t1 < 0.0 {return None} // this means both max_t0 and min_t1 are -ve, so the octree must be brhind the ray
         }
 
