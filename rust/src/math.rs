@@ -59,21 +59,21 @@ pub fn max(a: f64, b: f64) -> f64 {
 
 #[inline(always)]
 pub fn max_vec(items: Vec<f64>) -> f64 {
+    if items.len() == 0 {panic!()}
     let mut maxx = f64::NEG_INFINITY;
     for item in items {
         maxx = max(maxx, item);
     }
-    if maxx == f64::NEG_INFINITY {panic!()}
     maxx
 }
 
 #[inline(always)]
 pub fn min_vec(items: Vec<f64>) -> f64 {
+    if items.len() == 0 {panic!()}
     let mut minn = f64::INFINITY;
     for item in items {
         minn = min(minn, item);
     }
-    if minn == f64::INFINITY {panic!()}
     minn
 }
 
