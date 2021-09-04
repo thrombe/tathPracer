@@ -201,8 +201,8 @@ impl OctreeBranch {
         let dt_by_2 = *dt*0.5; // dt for every sub voxel is half of its parents (since size is half)
         
         let entry_child_mask = if tm.0.t < t.t {tm.0.plane} else {!tm.0.plane}
-        & if tm.1.t < t.t {tm.1.plane} else {!tm.1.plane}
-        & if tm.2.t < t.t {tm.2.plane} else {!tm.2.plane};
+                             & if tm.1.t < t.t {tm.1.plane} else {!tm.1.plane}
+                             & if tm.2.t < t.t {tm.2.plane} else {!tm.2.plane};
         
         // now try and visit every child in this branch which could be hit (in order of ray intersection)
         // at most 4 sub-voxels can be hit
@@ -226,6 +226,7 @@ impl OctreeBranch {
 
     #[inline(always)]
     pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, ts_p1: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>) -> Option<(RayHitfo, u16)> {
+        if ts_p1.t < t_correction {return None} // since ts > t and ts < 0 -> this voxel is completely behind the ray, so no need to enter
         if depth != Some(0) && child_mask & self.branch_mask > 0 { // check if the voxel is a branch
             let child = self.get_branch(child_mask);
             let t0 = self.get_t0_for(child_mask, dt, t0);
