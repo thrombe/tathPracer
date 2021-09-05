@@ -79,5 +79,5 @@ pub fn min_vec(items: Vec<f64>) -> f64 {
 
 #[inline(always)]
 pub fn abs(x: f64) -> f64 {
-    if x > 0.0 {x} else {0.0}
+    if x > 0.0 {x} else {-x}
 }
