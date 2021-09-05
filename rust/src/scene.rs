@@ -232,11 +232,11 @@ fn octree_test() -> World {
     });
     let material_index2 = oct.add_material(material);
 
-    let point = Vec3d::new(-0.99, -0.99, -0.99);
-    let normal = point.clone();
+    // let point = Vec3d::new(-0.99, -0.99, -0.99);
+    // let normal = point.clone();
     // oct.insert_voxel(point, 0, material_index, None);
-    let point = Vec3d::new(0.99, 0.99, 0.99);
-    let normal = point.clone();
+    // let point = Vec3d::new(0.99, 0.99, 0.99);
+    // let normal = point.clone();
     // oct.insert_voxel(point, 0, material_index2, None);
 
     let mut rng = rand::thread_rng();

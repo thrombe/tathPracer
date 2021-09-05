@@ -199,11 +199,11 @@ pub struct World {
 
 impl World {
     #[inline(always)]
-    fn hit(&self, ray: &Ray) -> Option<RayHitfo> {
+    fn hit(&self, ray: &Ray, rng: &mut Rng) -> Option<RayHitfo> {
         let mut min_t = self.cam.far_away;
         let mut hit_what = None;
         for object in &self.objects {
-            if let Some(hitfo) = object.hit(&ray, self.cam.t_correction) {
+            if let Some(hitfo) = object.hit(&ray, self.cam.t_correction, rng) {
                 if min_t > hitfo.t {
                     min_t = hitfo.t;
                     hit_what = Some(hitfo);
@@ -216,7 +216,7 @@ impl World {
     fn get_ray_color(&self, ray: &mut Ray, bouncy_depth: usize, rng: &mut Rng) -> Vec3d {
         if bouncy_depth <= 0 {return Vec3d::new(0.0, 0.0, 0.0)}
 
-        if let Some(hitfo) = self.hit(&ray) {
+        if let Some(hitfo) = self.hit(&ray, rng) {
             // lit objects
             if let Material::Lit(obj) = hitfo.material {
                 return obj.color

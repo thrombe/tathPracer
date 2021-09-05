@@ -182,6 +182,11 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
     pub fn get_normal(&self, pos_mask: u8) -> &Vec3d {
         &self.normals[self.get_info_index(self.normal_mask, pos_mask)]
     }
+    
+    #[inline(always)]
+    pub fn get_material_index(&self, child_mask: u8) -> u16 {
+        self.materials[self.get_info_index(self.child_mask, child_mask)]
+    }
 
     /// assuming that there is info for this voxel
     #[inline(always)]

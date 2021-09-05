@@ -16,11 +16,12 @@ pub enum Object {
 }
 
 impl Object {
-    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<RayHitfo> {
+    #[inline(always)]
+    pub fn hit(&self, ray: &Ray, t_correction: f64, rng: &mut Rng) -> Option<RayHitfo> {
         match self {
             Object::Sphere(obj) => obj.hit(ray, t_correction),
             Object::Plane(obj) => obj.hit(ray, t_correction),
-            Object::Octree(obj) => obj.hit(ray, t_correction),
+            Object::Octree(obj) => obj.hit(ray, t_correction, rng),
         }
     }
 }
@@ -105,7 +106,8 @@ impl Octree {
     // does this need t_correction??
      // it should not need it ig, cuz hits are only considered if it the vexel in front of the corrent voxel(if already in one)
      // maybe needed for bbox hit
-    pub fn hit(&self, ray: &Ray, t_correction: f64) -> Option<RayHitfo> {
+    #[inline]
+    pub fn hit(&self, ray: &Ray, t_correction: f64, rng: &mut Rng) -> Option<RayHitfo> {
         // intersect the Nabb and return if not hit
         // todo
 
@@ -167,8 +169,15 @@ impl Octree {
         
         // t value for first voxel is max(t for bbox.min)
         // how? -> well, the ray is in the voxel only if its inside all 3 plane boundaries. so max(t0) ensures this
-        if let Some(hitfo) = self.main_branch.hit(&ray, t, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1)) { // +1 to get this depth and insert depth in same level
-           Some(RayHitfo {
+        if let Some(mut hitfo) = self.main_branch.hit(&ray, t, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1)) { // +1 to get this depth and insert depth in same level
+            if hitfo.2 { // if ray.pos inside volumetric voxels, then shoot another ray till it hits some other material
+                if let Some(hitfo1) = self.main_branch.hit_volumetric(&ray, t, 0.0, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1), &self.materials[hitfo.1 as usize], hitfo.1, rng) {
+                    hitfo.0 = hitfo1.0;
+                    hitfo.1 = hitfo1.1;
+                }
+            }
+
+            Some(RayHitfo { // get new material, transform the ray back and send it off for more bounces
                ray: Ray::new(self.tree_to_world_space(hitfo.0.ray.pos), hitfo.0.ray.dir),
                material: self.materials[hitfo.1 as usize].clone(),
                ..hitfo.0
@@ -185,7 +194,8 @@ impl OctreeBranch {
     // eg: let 000 represent x, y, z, so 111 & 010 would mean gimme something (out of 111) that has y = 1 (this makes more sense with u8 but im lazy)
 
     // dt is current branch's (t1-t0)/2
-    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>) -> Option<(RayHitfo, u16)> {
+    // in the return type, the u16 is material_index, and the bool inficates whether the ray.pos is inside a volumetric voxel or not
+    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>) -> Option<(RayHitfo, u16, bool)> {
         // dbg!(self.pos);
 
         depth = depth.map(|x| x-1);        
@@ -225,7 +235,7 @@ impl OctreeBranch {
     }
 
     #[inline(always)]
-    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, ts_p1: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>) -> Option<(RayHitfo, u16)> {
+    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, ts_p1: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>) -> Option<(RayHitfo, u16, bool)> {
         if ts_p1.t < t_correction {return None} // since ts > t and ts < 0 -> this voxel is completely behind the ray, so no need to enter
         if depth != Some(0) && child_mask & self.branch_mask > 0 { // check if the voxel is a branch
             let child = self.get_branch(child_mask);
@@ -236,21 +246,24 @@ impl OctreeBranch {
         } else if child_mask & self.child_mask > 0 { // check if leaf
             if t.t < t_correction { // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
                 if self.volumetric_mask & child_mask > 0 && ts_p1.t > t_correction { // this means ray originates from inside a volumetric voxel thing
+                    // let mut t = t;
+                    // t.t += t_correction; // push ray a lil-bit more in the voxel before shooting it another time
                     let mut ray = ray.clone();
-                    ray.new_pos(ts_p1.t);
+                    // ray.new_pos(t.t);
                     return Some((RayHitfo {
-                        t: ts_p1.t,
+                        // t: t.t,
+                        t: 0.0,
                         normal: {
                             if self.normal_mask & child_mask > 0 {
-                                self.get_normal(child_mask).clone()*(-1.0)
+                                self.get_normal(child_mask).clone()
                             } else {
-                                ts_p1.get_plane_normal()*(-1.0)
+                                t.get_plane_normal()
                             }
                         },
                         material: Material::Lit(Lit {color: Vec3d::zero()}),
                         ray,
-                    }, self.materials[self.get_info_index(self.child_mask, child_mask)]))        
-                } else {
+                    }, self.get_material_index(child_mask), true))
+                        } else {
                     return None
                 }    
             }
@@ -267,7 +280,126 @@ impl OctreeBranch {
                 },
                 material: Material::Lit(Lit {color: Vec3d::zero()}),
                 ray,
-            }, self.materials[self.get_info_index(self.child_mask, child_mask)]))
+            }, self.get_material_index(child_mask), false))
+        }
+        None
+    }
+
+    // same as normal hit func but some differences for volumetric voxels
+    pub fn hit_volumetric(&self, ray: &Ray, t: BbHit, mut min_t1: f64, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>, current_material: &Material, current_material_index: u16, rng: &mut Rng) -> Option<(RayHitfo, u16)> {
+        depth = depth.map(|x| x-1);
+        let tm = (t0.0 + dt.x, t0.1 + dt.y, t0.2 + dt.z);
+        let t1 = (tm.0 + dt.x, tm.1 + dt.y, tm.2 + dt.z);
+        match self.pos { // this is used to find the last voxel that the ray might encounter before it exits so that it can hit it
+            OctreePos::Main => min_t1 = math::min_vec(vec![t1.0.t, t1.1.t, t1.2.t]),
+            _ => (),
+        }
+        let ts = t.get_next_hits(vec![tm.0, tm.1, tm.2, t1.0, t1.1, t1.2]);
+        let dt_by_2 = *dt*0.5;
+
+        let entry_child_mask = if tm.0.t < t.t {tm.0.plane} else {!tm.0.plane}
+                             & if tm.1.t < t.t {tm.1.plane} else {!tm.1.plane}
+                             & if tm.2.t < t.t {tm.2.plane} else {!tm.2.plane};
+        if let Some(hitfo) = self.try_hit_volumetric_subvoxel(entry_child_mask, ray, t, ts[0], min_t1, t0, dt, &dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
+            return Some(hitfo)
+        }
+        
+        let mut child = entry_child_mask;
+        for i in 0..3 {
+            match self.get_next_voxel(child, ts[i], t0) {
+                Some(next) => child = next,
+                None => return None,
+            }
+            if let Some(hitfo) = self.try_hit_volumetric_subvoxel(child, ray, ts[i], ts[i+1], min_t1, t0, dt, &dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
+                return Some(hitfo)
+            }
+        }
+        None
+    }
+
+    // this func ignores the voxel that are the same type as the voxel which has ray.pos
+    #[inline(always)]
+    pub fn try_hit_volumetric_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, ts_p1: BbHit, min_t1: f64, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>, current_material: &Material, current_material_index: u16, rng: &mut Rng) -> Option<(RayHitfo, u16)> {
+        if ts_p1.t < t_correction {return None}
+        if depth != Some(0) && child_mask & self.branch_mask > 0 {
+            let child = self.get_branch(child_mask);
+            let t0 = self.get_t0_for(child_mask, dt, t0);
+            if let Some(hitfo) = child.hit_volumetric(ray, t, min_t1, t0, dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
+                return Some(hitfo)
+            }
+        } else if child_mask & self.child_mask > 0 { // if its a filled voxel, then it can be either the same type as the voxel with ray.pos or some other type
+            if self.get_material_index(child_mask) == current_material_index {
+                if math::abs(ts_p1.t - min_t1) <= t_correction { // if the ray exits the entire octree, pretend an air voxel there
+                    let mut ray = ray.clone();
+                    ray.new_pos(ts_p1.t);
+                    let mut normal = {
+                        if self.normal_mask & child_mask > 0 {
+                            (*self.get_normal(child_mask))*(-1.0)
+                        } else {
+                            ts_p1.get_plane_normal()*(-1.0)
+                        }
+                    };
+                    return Some((RayHitfo {
+                        t: ts_p1.t,
+                        normal,
+                        material: Material::Lit(Lit {color: Vec3d::zero()}),
+                        ray,
+                    }, current_material_index))
+                } else {
+                    return None // if this voxel has the same material as the one with ray.pos, then ignore it
+                }
+            }
+            panic!("code below this isnt behaving correctly yet");
+
+            // filled voxel which is not current material
+            let mut t = t;
+            let mut ray = ray.clone();
+            ray.new_pos(t.t);
+            let mut normal = {
+                if self.normal_mask & child_mask > 0 {
+                    self.get_normal(child_mask).clone()
+                } else {
+                    t.get_plane_normal()
+                }
+            };
+
+            // if the next one is also volumetric but of diff type, 2 refractions are needed
+            if self.volumetric_mask & child_mask > 0 {
+                match current_material { // only volumetric materials handled here
+                    Material::Dielectric(mat) => (),
+                    _ => panic!("material not good"),
+                }
+                if let Some(rayy) = current_material.scatter(&ray, &(normal*(-1.0)), rng) {
+                    ray = rayy;
+                } else {panic!("ray not found")}
+                t.t += t_correction; // to make sure its inside the new volumetric voxel
+            } else {
+                t.t -= t_correction; // to make sure its not inside the non_volumetric voxel. this prevents extra refractions
+            }
+
+            return Some((RayHitfo {
+                t: t.t,
+                normal,
+                material: Material::Lit(Lit {color: Vec3d::zero()}),
+                ray,
+            }, self.get_material_index(child_mask)))
+    
+        } else { // air blocks inside octree -> return hit with flipped normal
+            let mut ray = ray.clone();
+            ray.new_pos(t.t);
+            let mut normal = {
+                if self.normal_mask & child_mask > 0 {
+                    (*self.get_normal(child_mask))*(-1.0)
+                } else {
+                    t.get_plane_normal()*(-1.0)
+                }
+            };
+            return Some((RayHitfo {
+                t: t.t,
+                normal,
+                material: Material::Lit(Lit {color: Vec3d::zero()}),
+                ray,
+            }, current_material_index))
         }
         None
     }

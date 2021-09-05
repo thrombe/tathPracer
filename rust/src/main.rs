@@ -24,6 +24,7 @@ fn main() {
     println!("{:?}", now.elapsed());
 }
 
+/*
 pub fn test() {
     use vec3d::Vec3d;
     use ray::Ray;
@@ -47,3 +48,4 @@ pub fn test() {
     println!("{:?}", hitfo);
     
 }
+*/
