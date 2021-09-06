@@ -170,8 +170,8 @@ impl Octree {
         // t value for first voxel is max(t for bbox.min)
         // how? -> well, the ray is in the voxel only if its inside all 3 plane boundaries. so max(t0) ensures this
         if let Some(mut hitfo) = self.main_branch.hit(&ray, t, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1)) { // +1 to get this depth and insert depth in same level
-            if hitfo.2 { // if ray.pos inside volumetric voxels, then shoot another ray till it hits some other material
-                if let Some(hitfo1) = self.main_branch.hit_volumetric(&ray, t, 0.0, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1), &self.materials[hitfo.1 as usize], hitfo.1, rng) {
+            if hitfo.2 { // if ray.pos inside transparent voxels, then shoot another ray till it hits some other material
+                if let Some(hitfo1) = self.main_branch.hit_transparent(&ray, t, 0.0, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1), &self.materials[hitfo.1 as usize], hitfo.1, rng) {
                     hitfo.0 = hitfo1.0;
                     hitfo.1 = hitfo1.1;
                 }
@@ -194,7 +194,7 @@ impl OctreeBranch {
     // eg: let 000 represent x, y, z, so 111 & 010 would mean gimme something (out of 111) that has y = 1 (this makes more sense with u8 but im lazy)
 
     // dt is current branch's (t1-t0)/2
-    // in the return type, the u16 is material_index, and the bool inficates whether the ray.pos is inside a volumetric voxel or not
+    // in the return type, the u16 is material_index, and the bool inficates whether the ray.pos is inside a transparent voxel or not
     pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>) -> Option<(RayHitfo, u16, bool)> {
         // dbg!(self.pos);
 
@@ -245,48 +245,21 @@ impl OctreeBranch {
             }
         } else if child_mask & self.child_mask > 0 { // check if leaf
             if t.t < t_correction { // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
-                if self.volumetric_mask & child_mask > 0 && ts_p1.t > t_correction { // this means ray originates from inside a volumetric voxel thing
-                    // let mut t = t;
-                    // t.t += t_correction; // push ray a lil-bit more in the voxel before shooting it another time
-                    let mut ray = ray.clone();
-                    // ray.new_pos(t.t);
-                    return Some((RayHitfo {
-                        // t: t.t,
-                        t: 0.0,
-                        normal: {
-                            if self.normal_mask & child_mask > 0 {
-                                self.get_normal(child_mask).clone()
-                            } else {
-                                t.get_plane_normal()
-                            }
-                        },
-                        material: Material::Lit(Lit {color: Vec3d::zero()}),
-                        ray,
-                    }, self.get_material_index(child_mask), true))
-                        } else {
+                if self.transparency_mask & child_mask > 0 && ts_p1.t > t_correction { // this means ray originates from inside a transparent voxel thing
+                    let hitfo = self.submit_hitfo(ray, BbHit::new(0.0, t.plane), child_mask, false, self.get_material_index(child_mask));
+                    return Some((hitfo.0, hitfo.1, true))
+                } else {
                     return None
                 }    
             }
-            let mut ray = ray.clone();
-            ray.new_pos(t.t);
-            return Some((RayHitfo {
-                t: t.t,
-                normal: {
-                    if self.normal_mask & child_mask > 0 {
-                        self.get_normal(child_mask).clone()
-                    } else {
-                        t.get_plane_normal()
-                    }
-                },
-                material: Material::Lit(Lit {color: Vec3d::zero()}),
-                ray,
-            }, self.get_material_index(child_mask), false))
+            let hitfo = self.submit_hitfo(ray, t, child_mask, false, self.get_material_index(child_mask));
+            return Some((hitfo.0, hitfo.1, false))
         }
         None
     }
 
-    // same as normal hit func but some differences for volumetric voxels
-    pub fn hit_volumetric(&self, ray: &Ray, t: BbHit, mut min_t1: f64, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>, current_material: &Material, current_material_index: u16, rng: &mut Rng) -> Option<(RayHitfo, u16)> {
+    // same as normal hit func but some differences for transparent voxels
+    pub fn hit_transparent(&self, ray: &Ray, t: BbHit, mut min_t1: f64, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>, current_material: &Material, current_material_index: u16, rng: &mut Rng) -> Option<(RayHitfo, u16)> {
         depth = depth.map(|x| x-1);
         let tm = (t0.0 + dt.x, t0.1 + dt.y, t0.2 + dt.z);
         let t1 = (tm.0 + dt.x, tm.1 + dt.y, tm.2 + dt.z);
@@ -300,7 +273,7 @@ impl OctreeBranch {
         let entry_child_mask = if tm.0.t < t.t {tm.0.plane} else {!tm.0.plane}
                              & if tm.1.t < t.t {tm.1.plane} else {!tm.1.plane}
                              & if tm.2.t < t.t {tm.2.plane} else {!tm.2.plane};
-        if let Some(hitfo) = self.try_hit_volumetric_subvoxel(entry_child_mask, ray, t, ts[0], min_t1, t0, dt, &dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
+        if let Some(hitfo) = self.try_hit_transparent_subvoxel(entry_child_mask, ray, t, ts[0], min_t1, t0, dt, &dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
             return Some(hitfo)
         }
         
@@ -310,7 +283,7 @@ impl OctreeBranch {
                 Some(next) => child = next,
                 None => return None,
             }
-            if let Some(hitfo) = self.try_hit_volumetric_subvoxel(child, ray, ts[i], ts[i+1], min_t1, t0, dt, &dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
+            if let Some(hitfo) = self.try_hit_transparent_subvoxel(child, ray, ts[i], ts[i+1], min_t1, t0, dt, &dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
                 return Some(hitfo)
             }
         }
@@ -319,32 +292,18 @@ impl OctreeBranch {
 
     // this func ignores the voxel that are the same type as the voxel which has ray.pos
     #[inline(always)]
-    pub fn try_hit_volumetric_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, ts_p1: BbHit, min_t1: f64, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>, current_material: &Material, current_material_index: u16, rng: &mut Rng) -> Option<(RayHitfo, u16)> {
+    pub fn try_hit_transparent_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, ts_p1: BbHit, min_t1: f64, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>, current_material: &Material, current_material_index: u16, rng: &mut Rng) -> Option<(RayHitfo, u16)> {
         if ts_p1.t < t_correction {return None}
         if depth != Some(0) && child_mask & self.branch_mask > 0 {
             let child = self.get_branch(child_mask);
             let t0 = self.get_t0_for(child_mask, dt, t0);
-            if let Some(hitfo) = child.hit_volumetric(ray, t, min_t1, t0, dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
+            if let Some(hitfo) = child.hit_transparent(ray, t, min_t1, t0, dt_by_2, t_correction, depth, current_material, current_material_index, rng) {
                 return Some(hitfo)
             }
         } else if child_mask & self.child_mask > 0 { // if its a filled voxel, then it can be either the same type as the voxel with ray.pos or some other type
             if self.get_material_index(child_mask) == current_material_index {
                 if math::abs(ts_p1.t - min_t1) <= t_correction { // if the ray exits the entire octree, pretend an air voxel there
-                    let mut ray = ray.clone();
-                    ray.new_pos(ts_p1.t);
-                    let mut normal = {
-                        if self.normal_mask & child_mask > 0 {
-                            (*self.get_normal(child_mask))*(-1.0)
-                        } else {
-                            ts_p1.get_plane_normal()*(-1.0)
-                        }
-                    };
-                    return Some((RayHitfo {
-                        t: ts_p1.t,
-                        normal,
-                        material: Material::Lit(Lit {color: Vec3d::zero()}),
-                        ray,
-                    }, current_material_index))
+                    return Some(self.submit_hitfo(ray, ts_p1, child_mask, true, current_material_index))
                 } else {
                     return None // if this voxel has the same material as the one with ray.pos, then ignore it
                 }
@@ -362,45 +321,50 @@ impl OctreeBranch {
                 }
             };
 
-            // if the next one is also volumetric but of diff type, 2 refractions are needed
-            if self.volumetric_mask & child_mask > 0 {
-                match current_material { // only volumetric materials handled here
+            // if the next one is also transparent but of diff type, 2 refractions are needed
+            if self.transparency_mask & child_mask > 0 {
+                match current_material { // only transparent materials handled here
                     Material::Dielectric(mat) => (),
                     _ => panic!("material not good"),
                 }
                 if let Some(rayy) = current_material.scatter(&ray, &(normal*(-1.0)), rng) {
                     ray = rayy;
                 } else {panic!("ray not found")}
-                t.t += t_correction; // to make sure its inside the new volumetric voxel
+                t.t += t_correction; // to make sure its inside the new transparent voxel
             } else {
-                t.t -= t_correction; // to make sure its not inside the non_volumetric voxel. this prevents extra refractions
+                t.t -= t_correction; // to make sure its not inside the non_transparent voxel. this prevents extra refractions
             }
 
             return Some((RayHitfo {
                 t: t.t,
-                normal,
+                normal, ray,
                 material: Material::Lit(Lit {color: Vec3d::zero()}),
-                ray,
             }, self.get_material_index(child_mask)))
     
         } else { // air blocks inside octree -> return hit with flipped normal
-            let mut ray = ray.clone();
-            ray.new_pos(t.t);
-            let mut normal = {
-                if self.normal_mask & child_mask > 0 {
-                    (*self.get_normal(child_mask))*(-1.0)
-                } else {
-                    t.get_plane_normal()*(-1.0)
-                }
-            };
-            return Some((RayHitfo {
-                t: t.t,
-                normal,
-                material: Material::Lit(Lit {color: Vec3d::zero()}),
-                ray,
-            }, current_material_index))
+            return Some(self.submit_hitfo(ray, t, child_mask, true, current_material_index))
         }
         None
+    }
+
+    #[inline(always)]
+    pub fn submit_hitfo(&self, ray: &Ray, t: BbHit, child_mask: u8, flip_normal: bool, material_index: u16) -> (RayHitfo, u16) {
+        let mut ray = ray.clone();
+        ray.new_pos(t.t);
+        let mut normal = {
+            if self.normal_mask & child_mask > 0 {
+                self.get_normal(child_mask).clone()
+            } else {
+                t.get_plane_normal()
+            }
+        };
+        if flip_normal {normal *= -1.0}
+        (RayHitfo {
+            t: t.t,
+            normal,
+            material: Material::Lit(Lit {color: Vec3d::zero()}),
+            ray,
+        }, material_index)
     }
 
     /// gives the voxel_pos when crossing a plane (after crossing the yz plane, we either go to the right voxel, or exit)

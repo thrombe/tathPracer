@@ -35,9 +35,9 @@ impl Octree {
 
     pub fn insert_voxel(&mut self, mut point: Vec3d, depth: usize, material_index: u16, normal: Option<Vec3d>) {
         point = self.world_to_tree_space(point);
-        let volumetric = if let Material::Dielectric(_) = self.materials[material_index as usize] {true} else {false};
+        let transparency = if let Material::Dielectric(_) = self.materials[material_index as usize] {true} else {false};
         if (math::abs(point.x) > 1.0) || (math::abs(point.y) > 1.0) || (math::abs(point.z) > 1.0) {panic!()}
-        self.main_branch.insert_voxel_from_point(point, depth, material_index, normal, volumetric);
+        self.main_branch.insert_voxel_from_point(point, depth, material_index, normal, transparency);
     }
 
     #[inline(always)]
@@ -68,7 +68,7 @@ pub struct OctreeBranch {
     pub normal_mask: u8, // this space was being wasted anyway // if set, then this voxel has normal
     pub normals: Vec<Vec3d>, // index -> the index of the voxel in the normal_mask while ignoring 0's,
     // for eg, 01001000(normal_map), normal for 01000000(voxel) is 1 and for 00001000(voxel) is 0
-    pub volumetric_mask: u8,
+    pub transparency_mask: u8,
     pub materials: Vec<u16>, // index from Octree.materials
 }
 
@@ -76,7 +76,7 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
     fn new(pos: OctreePos) -> Self {
         Self {
             pos, child_mask: 0, branch_mask: 0, chilranches: Vec::<Self>::new(), normal_mask: 0,
-            normals: Vec::<Vec3d>::new(), materials: Vec::<u16>::new(), volumetric_mask: 0,
+            normals: Vec::<Vec3d>::new(), materials: Vec::<u16>::new(), transparency_mask: 0,
         }
     }
 
@@ -90,14 +90,14 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
         OctreePos::new(pos)
     }
 
-    fn modify_voxel(&mut self, pos_mask: u8, material_index: u16, normal: Option<Vec3d>, volumetric: bool) {
+    fn modify_voxel(&mut self, pos_mask: u8, material_index: u16, normal: Option<Vec3d>, transparency: bool) {
         let index = self.get_info_index(self.child_mask, pos_mask);
         self.materials[index] = material_index;
 
-        if volumetric && !(self.volumetric_mask & pos_mask > 0) {
-            self.volumetric_mask = self.volumetric_mask | pos_mask;
-        } else if !volumetric && self.volumetric_mask & pos_mask > 0 {
-            self.volumetric_mask = self.volumetric_mask & !pos_mask;
+        if transparency && !(self.transparency_mask & pos_mask > 0) {
+            self.transparency_mask = self.transparency_mask | pos_mask;
+        } else if !transparency && self.transparency_mask & pos_mask > 0 {
+            self.transparency_mask = self.transparency_mask & !pos_mask;
         }
 
         if let Some(normal) = normal { // if normal is supplied, either set it or change it
@@ -115,9 +115,9 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
         }
     }
 
-    fn set_voxel(&mut self, pos_mask: u8, material_index: u16, normal: Option<Vec3d>, volumetric: bool) {
+    fn set_voxel(&mut self, pos_mask: u8, material_index: u16, normal: Option<Vec3d>, transparency: bool) {
         if self.child_mask & pos_mask != 0 {
-            self.modify_voxel(pos_mask, material_index, normal, volumetric);
+            self.modify_voxel(pos_mask, material_index, normal, transparency);
             return
         }
         self.child_mask = self.child_mask | pos_mask;
@@ -126,8 +126,8 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
             self.insert_normal(normal, pos_mask);
         }
 
-        if volumetric {
-            self.volumetric_mask = self.volumetric_mask | pos_mask;
+        if transparency {
+            self.transparency_mask = self.transparency_mask | pos_mask;
         }
 
         let index = self.get_info_index(self.child_mask, pos_mask);
@@ -154,28 +154,28 @@ impl OctreeBranch { // all branches consider their space as -1 to 1
         self.get_voxel_coord(self.pos)
     }
 
-    fn insert_voxel_from_point(&mut self, point: Vec3d, depth: usize, material_index: u16, normal: Option<Vec3d>, volumetric: bool) {
+    fn insert_voxel_from_point(&mut self, point: Vec3d, depth: usize, material_index: u16, normal: Option<Vec3d>, transparency: bool) {
         let pos = self.get_pos_from_point(&point);
         let pos_mask = pos.get_mask();
         // println!("{:?}", pos);
         if depth == 0 {
-            self.set_voxel(pos_mask, material_index, normal, volumetric);
+            self.set_voxel(pos_mask, material_index, normal, transparency);
             return
         }
-        let branch = self.add_or_get_branch(pos_mask, material_index, normal, volumetric);
-        branch.insert_voxel_from_point((point-branch.get_coord())*2.0, depth-1, material_index, normal, volumetric);
+        let branch = self.add_or_get_branch(pos_mask, material_index, normal, transparency);
+        branch.insert_voxel_from_point((point-branch.get_coord())*2.0, depth-1, material_index, normal, transparency);
     }
     
-    fn add_or_get_branch(&mut self, pos_mask: u8, material_index: u16, normal: Option<Vec3d>, volumetric: bool) -> &mut Self {
+    fn add_or_get_branch(&mut self, pos_mask: u8, material_index: u16, normal: Option<Vec3d>, transparency: bool) -> &mut Self {
         if (self.branch_mask & pos_mask) > 0 {return self.get_branch_mut(pos_mask)}
         // if this isnt a branch
-        self.add_branch(pos_mask, material_index, normal, volumetric)
+        self.add_branch(pos_mask, material_index, normal, transparency)
     }
 
-    fn add_branch(&mut self, pos_mask: u8, material_index: u16, normal: Option<Vec3d>, volumetric: bool) -> &mut Self {
+    fn add_branch(&mut self, pos_mask: u8, material_index: u16, normal: Option<Vec3d>, transparency: bool) -> &mut Self {
         // create a new voxel
         if !(self.child_mask & pos_mask > 0) {
-            self.set_voxel(pos_mask, material_index, normal, volumetric);
+            self.set_voxel(pos_mask, material_index, normal, transparency);
         }
 
         // create a new branch

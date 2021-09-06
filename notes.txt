@@ -1,14 +1,29 @@
 
 plan (priority - only a few items here plz):
   . make the world into an octree - so objects inside this octree
-  . how do i do dielectric voxels?
+    . VoxelOctree, ObjectOctree or WorldOctree
+  /. optimise ray traversal -ve t (more info below) **IMP
+  /. how do i do dielectric voxels?
+    /. better name than "volumetric" ?
+    /. total internal reflection is a pain for voxels.
+      \. maybe add a trigger for this?
+      \. it seems, voxels quite often just give very long streaks of reflections (>1000)
+      . if tir persists for long time, maybe turn it off somehow (for each ray)
+        . pass the bounce_depth in scatter?
+  . multi-thread syncronised progress indicator
+    . what can i do to not slow this down?
+      . maybe use channels?
+      . atomic add method
+  . better img.rs
   . is the function for world(relative to main octree) coords of voxels useful? - then make it
   . triangle mesh importing and tracing (later can be voxelised)
+  . add readme with pics and submit it in rt1wk implimentations
 
 todo/ideas:
   . use f64::infinity or whatever consts
   . multiple samples if material is lambertian ????
   . multi-colored materials (all types?)
+    . an extra enum for this? - it can have all the different coloring patterns in it
     . this will look cool on random objects (like the velvet coats or whatever)
     . color as a function of direction of normal (like that of sky)
     . color as func of angle with normal?
@@ -24,6 +39,7 @@ todo/ideas:
       . some probability that it behaves in a way
       . can i just have 1 material then?
         . with different settings
+    . hollowgram like material
     . is sub-surface scatterng doable for me?
   . fog
     . get 2 limits for t (where there is fog)
@@ -49,7 +65,6 @@ todo/ideas:
       . this isnt very efficient for static scenes tho cuz we dont need to move objects often
     . maybe aabb thing for triangels and oct-tree for rest?
     . oct-tree
-      /. this way, i can have a lot of objects without too much probs
       . i can use marching cubes to create terrain and render it on fly (dont need to store it)
         . if storage is a big prob, then create it while tracing rays, tho this will be slow af
         . mayebe i can cache a few cubes so that we only create the cube once (per thread) and reuse it for all rays in that pixel (group of pixels)
@@ -64,23 +79,18 @@ todo/ideas:
         \. or clip triangles till it fits in a leaf + limit to how small it can go
         . OR store a triangle in the smallest cube it fits in, dosent matter if its a leaf or branch
           . this way, no duplicates
-      . maybe convert triangle meshes into voxel things first and then do the tracing
-        . how voxelise?
-          . triangle meshes are closed usually, so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
-            . the interior can have big voxels
-          . maybe voxels can be filled like rasterisation. move a point along the area of triangle and put a voxel there
-            . for more accurate things, insert the point a few more levels deep and check if it lies closeish to the centre or lies along boundaries
-            . if it lies along the boundaries, then we can either ignore the voxel or check a few more things
-              . the normsls of triangles usually point outside, so maybe this can be used to decide if a voxel should go in or not
-          . flood-fill the outside and then invert it
-          . triangle voxelise
-            . find bb and sample 8 points within a voxel to decide if it should be filled
-            . either every voxel.in this can be checked (recursive) (cuz simpler)
-              or only check (recursive) that actually intersect
+    . how voxelise meshes?
+      . triangle meshes are closed usually, so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
+        . the interior can have big voxels
+      . maybe voxels can be filled like rasterisation. move a point along the area of triangle and put a voxel there
+        . for more accurate things, insert the point a few more levels deep and check if it lies closeish to the centre or lies along boundaries
+        . if it lies along the boundaries, then we can either ignore the voxel or check a few more things
+          . the normsls of triangles usually point outside, so maybe this can be used to decide if a voxel should go in or not
+      . flood-fill the outside and then invert it
+      . find bb and sample 8 points within a voxel to decide if it should be filled
+        either every voxel.in this can be checked (recursive) (cuz simpler)
+        or only check (recursive) that actually intersect
   . octree
-    . a kind of problemish is there. inserting a smol voxel inside a earlier big voxel kinda makes the bigger one not visible in images
-      . this may be desirable tho, cuz this way, we can create models with different colors for bigger voxels
-        like, recursively voxelising something in greater and greater detail with maybe different colors for each level
     . if multithreading gives trouble with arc and stuff, try the share/sync trait
     . this seems slowish, profiling needed
     . see ram stats + how crazy can i go with it.
@@ -92,21 +102,28 @@ todo/ideas:
     . voxel normals
       . many voxels can have same normal (big triangle), can i do something to save space here?
         . like is no normal, check parents normal recursively
-    . change ray cast depth as t increases maybe?
-    . i dont think Dielectric material would work good here (not yet atleast)
-      . maybe another "volumetric_mask" per voxel?
-        . material_mask can go u16
-        . these dont require normals
-          . maybe they do, glass can have a normal, and while going out, you flip this normal
-            . dosent sound too accurate, anything better i can do?
-            . like use dt for direction change
-            . or maybe dt and the cube infered normal + flipped normal
-          . they can either be randomised (for fog stuff), or inferred from the t_plane + ray.dir or something
-      . so it can have a different reaction when leaving voxel
-        . leaving voxel - check ray pos and use t1
-        . when leaving the try_hit_subvoxel, it can call something else maybe
+    /. dielectric voxels
+      /. how
+        /. ts and t have different signs, then return to main octree (with signal)
+        /. octree then checks the signal and calls a special func to traverse volumetric or something
+        /. this func checks if the next voxel is the same material as the one where raypos is
+          and returns the t for which its either some other material (normal not reversed)
+          if its another type of volumetric or air, it returns with the reversed normal
+      . using the input normals for dielectric dont sound too accurate(cuz the ray can enter and exit from different planes), anything better i can do?
+        . like use dt for direction change
+        . or maybe dt and the cube infered normal + flipped normal
+    /. can i optimise the traversal when ray pos is inside?
+      /. ts -ve, just go to it and ignore the children at current t
+      /. if ts[0] is -ve, it means that the currently hit voxel is completely behind the ray
+      /. add this statement just after computing ts
+        /. jump to that ts which is greatest and -ve
+        /. OR if ts < 0 then just dont go inside the voxel
+        /. since all next voxels need to be calculated anyway, just add it in first line of try_hit_subvoxel
+        /. if ts_p1.t < 0.0 {return None} // since ts > t and ts < 0 -> this voxel is completely behind the ray, so no need to enter
     . compression
       . voxels with no normals and default materials can be considered mergable with voxels that have materials and normals (if not visible)
+      . merge similar sibling voxels if all 8 are similar
+    . change ray cast depth as t increases maybe?
   . more shapes
     . rays/lines (will be cool to view rays)
       . how? these are a bit too thin
