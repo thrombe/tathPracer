@@ -349,7 +349,6 @@ impl OctreeBranch {
                     return None // if this voxel has the same material as the one with ray.pos, then ignore it
                 }
             }
-            panic!("code below this isnt behaving correctly yet");
 
             // filled voxel which is not current material
             let mut t = t;

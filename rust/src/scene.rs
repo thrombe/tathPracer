@@ -218,13 +218,14 @@ fn octree_test() -> World {
     // READ NOTES - octree
     // check if reflections work good within octree
 
-    let mut oct = Octree::new(2.0, Some(2));
+    let mut oct = Octree::new(2.0, Some(1));
     
     let material = Material::Lambertian(Lambertian {
         color: Vec3d::new(0.7, 0.4, 0.7),
     });
     let material_index = oct.add_material(material);
 
+    // let material = Material::Lambertian(Lambertian {
     let material = Material::Dielectric(Dielectric {
         color: Vec3d::new(0.99, 0.9, 0.9),
         refractive_index: 1.3,
@@ -232,21 +233,39 @@ fn octree_test() -> World {
     });
     let material_index2 = oct.add_material(material);
 
-    // let point = Vec3d::new(-0.99, -0.99, -0.99);
-    // let normal = point.clone();
-    // oct.insert_voxel(point, 0, material_index, None);
+    let mut rng = rand::thread_rng();
+    let random = Uniform::new(-1.0, 1.0);
+    // for _ in 0..100 {
+    //     let point = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), 0.01);
+    //     oct.insert_voxel(point, 1, material_index, None);
+    // }
+    for _ in 0..500 {
+        let point = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng));
+        let normal = point.clone().unit();
+        oct.insert_voxel(point, 1, material_index2, None);
+    }
+
+    let point = Vec3d::new(-0.1, 0.01, -0.0);
+    let normal = point.clone();
+    oct.insert_voxel(point, 1, material_index, None);
     // let point = Vec3d::new(0.99, 0.99, 0.99);
     // let normal = point.clone();
     // oct.insert_voxel(point, 0, material_index2, None);
 
-    let mut rng = rand::thread_rng();
-    let random = Uniform::new(-1.0, 1.0);
-    for _ in 0..500 {
-        let point = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng));
-        let normal = point.clone().unit();
-        oct.insert_voxel(point, 4, material_index2, None);
-    }
-    
     world.objects.push(Object::Octree(oct));
+
+    // debug rays
+    // use super::ray::Ray;
+    // let mut rng = rand::thread_rng();
+    // let ray = Ray::new(world.cam.pos, world.cam.fwd);
+    // if let Some(hitfo) = world.objects[0].hit(&ray, world.cam.t_correction, &mut rng) {
+    //     dbg!(&hitfo);
+    //     if let Some(ray) = hitfo.material.scatter(&hitfo.ray, &hitfo.normal, &mut rng) {
+    //         if let Some(hitfo) = world.objects[0].hit(&ray, world.cam.t_correction, &mut rng) {
+    //             dbg!(&hitfo);
+    //         }
+    //     }
+    // }
+
     world
 }
