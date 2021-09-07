@@ -4,22 +4,24 @@
 
 use super::vec3d::Vec3d;
 use super::material::{Material, Lit};
-use super::math;
+// use super::math;
 
 #[derive(Debug)]
 pub struct VoxelOctree {
     // entire octree lies in -1 to 1, half_size converts to and from this to world space or whatever
-    half_size: f64,
+    pub half_size: f64,
     pub scale_factor: f64,
+    pub center: Vec3d,
     pub main_branch: VoxelOctreeBranch,
     pub materials: Vec<Material>, // material at 0 index should be some default material for undefined stuff
     pub lod_depth_limit: Option<u16>,
 }
 
 impl VoxelOctree {
-    pub fn new(size: f64, lod_depth_limit: Option<u16>) -> Self {
+    pub fn new(center:Vec3d, size: f64, lod_depth_limit: Option<u16>) -> Self {
         Self {
             lod_depth_limit,
+            center,
             half_size: size/2.0,
             scale_factor: 2.0/size,
             main_branch: VoxelOctreeBranch::new(OctreePos::Main),
@@ -36,18 +38,18 @@ impl VoxelOctree {
     pub fn insert_voxel(&mut self, mut point: Vec3d, depth: usize, material_index: u16, normal: Option<Vec3d>) {
         point = self.world_to_tree_space(point);
         let transparency = if let Material::Dielectric(_) = self.materials[material_index as usize] {true} else {false};
-        if (math::abs(point.x) > 1.0) || (math::abs(point.y) > 1.0) || (math::abs(point.z) > 1.0) {panic!()}
+        if (point.x.abs() > 1.0) || (point.y.abs() > 1.0) || (point.z.abs() > 1.0) {panic!()}
         self.main_branch.insert_voxel_from_point(point, depth, material_index, normal, transparency);
     }
 
     #[inline(always)]
     pub fn world_to_tree_space(&self, pos: Vec3d) -> Vec3d {
-        pos*self.scale_factor
+        (pos-self.center)*self.scale_factor
     }
 
     #[inline(always)]
     pub fn tree_to_world_space(&self, pos: Vec3d) -> Vec3d {
-        pos*self.half_size
+        (pos+self.center)*self.half_size
     }
 
     /// deletes empty branches, deletes unnecessary voxels

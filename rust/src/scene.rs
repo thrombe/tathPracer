@@ -1,3 +1,4 @@
+#![allow(unused_variables)]
 
 use rand::distributions::{Uniform, Distribution};
 use std::f64::consts::PI;
@@ -12,11 +13,11 @@ use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 
 pub fn gen_world() -> World {
-    scene1()
-    // octree_test()
+    spheres()
+    // voxel_octree()
 }
 
-fn scene1() -> World {
+fn spheres() -> World {
 
     let width = 720;
     let height = 480;
@@ -28,7 +29,7 @@ fn scene1() -> World {
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        octree: WorldOctree::new(100.0),
+        octree: WorldOctree::new(50.0),
     };
     
     world.octree.insert_object( // ground
@@ -127,18 +128,18 @@ fn scene1() -> World {
             }),
         })
     );
-    // world.octree.insert_object( // trying hollow glass sphere
-    //     Object::Sphere(Sphere {
-    //         center: Vec3d::new(2.0, 1.0, -10.0),
-    //         radius: -0.3,
-    //         material: Material::Dielectric(Dielectric {
-    //             // color: Vec3d::new(0.44, 0.21, 1.0),
-    //             color: Vec3d::new(1.0, 1.0, 1.0),
-    //             refractive_index: 1.5,
-    //             fuzz: 0.0,
-    //         }),
-    //     })
-    // );
+    world.octree.insert_object( // trying hollow glass sphere
+        Object::Sphere(Sphere {
+            center: Vec3d::new(2.0, 1.0, -10.0),
+            radius: -0.3,
+            material: Material::Dielectric(Dielectric {
+                // color: Vec3d::new(0.44, 0.21, 1.0),
+                color: Vec3d::new(1.0, 1.0, 1.0),
+                refractive_index: 1.5,
+                fuzz: 0.0,
+            }),
+        })
+    );
 
     let mut rng = rand::thread_rng();
     let random = Uniform::new(0.0, 1.0);
@@ -199,8 +200,7 @@ fn scene1() -> World {
     world
 }
 
-/*
-fn octree_test() -> World {
+fn voxel_octree() -> World {
 
     let width = 720;
     let height = 480;
@@ -212,14 +212,11 @@ fn octree_test() -> World {
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        objects: Vec::<Object>::new(),
+        octree: WorldOctree::new(100.0),
     };
     // world.cam.bouncy_depth = 1000;
 
-    // READ NOTES - octree
-    // check if reflections work good within octree
-
-    let mut oct = VoxelOctree::new(2.0, Some(1));
+    let mut oct = VoxelOctree::new(Vec3d::zero(), 2.0, Some(1));
     
     let material = Material::Lambertian(Lambertian {
         color: Vec3d::new(0.7, 0.4, 0.7),
@@ -253,7 +250,7 @@ fn octree_test() -> World {
     // let normal = point.clone();
     // oct.insert_voxel(point, 0, material_index2, None);
 
-    world.objects.push(Object::VoxelOctree(oct));
+    world.octree.insert_object(Object::VoxelOctree(oct));
 
     // debug rays
     // use super::ray::Ray;
@@ -270,4 +267,3 @@ fn octree_test() -> World {
 
     world
 }
-*/

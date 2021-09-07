@@ -84,7 +84,8 @@ impl Sphere {
     }
 
     pub fn get_aabb(&self) -> Aabb {
-        let half_diag = Vec3d::new(self.radius, self.radius, self.radius);
+        let radius = self.radius.abs();
+        let half_diag = Vec3d::new(radius, radius, radius);
         Aabb::new(self.center-half_diag, self.center+half_diag)
     }
 }
@@ -211,8 +212,8 @@ impl VoxelOctree {
     }
 
     pub fn get_aabb(&self) -> Aabb {
-        todo!();
-        Aabb::new(Vec3d::zero(), Vec3d::zero())
+        let half_diag = Vec3d::new(self.half_size, self.half_size, self.half_size);
+        Aabb::new(self.center-half_diag, self.center+half_diag)
     }
 }
 
@@ -330,7 +331,7 @@ impl VoxelOctreeBranch {
             }
         } else if child_mask & self.child_mask > 0 { // if its a filled voxel, then it can be either the same type as the voxel with ray.pos or some other type
             if self.get_material_index(child_mask) == current_material_index {
-                if math::abs(ts_p1.t - min_t1) <= t_correction { // if the ray exits the entire octree, pretend an air voxel there
+                if (ts_p1.t - min_t1).abs() <= t_correction { // if the ray exits the entire octree, pretend an air voxel there
                     return Some(self.submit_hitfo(ray, ts_p1, child_mask, true, current_material_index))
                 } else {
                     return None // if this voxel has the same material as the one with ray.pos, then ignore it
@@ -341,7 +342,7 @@ impl VoxelOctreeBranch {
             let mut t = t;
             let mut ray = ray.clone();
             ray.new_pos(t.t);
-            let mut normal = {
+            let normal = {
                 if self.normal_mask & child_mask > 0 {
                     self.get_normal(child_mask).clone()
                 } else {
@@ -352,7 +353,7 @@ impl VoxelOctreeBranch {
             // if the next one is also transparent but of diff type, 2 refractions are needed
             if self.transparency_mask & child_mask > 0 {
                 match current_material { // only transparent materials handled here
-                    Material::Dielectric(mat) => (),
+                    Material::Dielectric(_) => (),
                     _ => panic!("material not good"),
                 }
                 if let Some(rayy) = current_material.scatter(&ray, &(normal*(-1.0)), rng) {

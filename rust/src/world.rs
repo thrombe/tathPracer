@@ -14,6 +14,7 @@ use rand::distributions::{Uniform, Distribution};
 use std::thread; // for multi-threading
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct Camera {
     // public for access from world
     // parameters
@@ -188,7 +189,7 @@ pub fn run_world() {
     img::dump_img(img);
 }
 
-
+#[derive(Debug)]
 pub struct World {
     pub octree: WorldOctree, // Vec<Box<dyn hittable>> or enum ?
     pub cam: Camera,

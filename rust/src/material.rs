@@ -5,7 +5,7 @@ use super::vec3d::Vec3d;
 
 use super::ray::Ray;
 use super::world::Rng;
-use super::math;
+// use super::math;
 
 #[derive(Debug, Clone)]
 pub enum Material {
@@ -92,7 +92,7 @@ impl Material {
                         Some(Ray::new(ray.pos, ray_dir_unit - normal*2.0*ray_dir_unit.dot(normal) + fuzz))
                 } else { // refraction
                     let ray_dir_perp = (ray_dir_unit + normal * cos_i) * ri_ratio;
-                    let ray_dir_parallel = normal * (-1.0) * math::abs(1.0 - ray_dir_perp.dot(ray_dir_perp)).sqrt();
+                    let ray_dir_parallel = normal * (-1.0) * (1.0 - ray_dir_perp.dot(ray_dir_perp)).abs().sqrt();
                     Some(Ray::new(ray.pos, ray_dir_perp + ray_dir_parallel + fuzz))
                 }
             },

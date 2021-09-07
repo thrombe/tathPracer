@@ -278,7 +278,7 @@ impl WorldOctreeBranch {
         // required t = min(objects in curr branch, min(objects in subvoxels))
         if let Some(hitfo) = self.hit_objects_inside(ray, t_correction, rng) {
             if hitfo.t < min_t {
-                min_t = hitfo.t;
+                // min_t = hitfo.t;
                 closest = Some(hitfo);        
             }
         }
