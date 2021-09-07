@@ -29,7 +29,7 @@ fn spheres() -> World {
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        octree: ObjectOctree::new(50.0),
+        octree: ObjectOctree::new(Vec3d::zero(), 50.0),
     };
     
     world.octree.insert_object( // ground
@@ -212,7 +212,7 @@ fn voxel_octree() -> World {
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        octree: ObjectOctree::new(100.0),
+        octree: ObjectOctree::new(Vec3d::zero(), 100.0),
     };
     // world.cam.bouncy_depth = 1000;
 

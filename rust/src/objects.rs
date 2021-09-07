@@ -8,6 +8,7 @@ use super::material::{Material, Lit};
 use super::ray::{Ray, RayHitfo};
 use super::world::Rng;
 use super::voxel_octree::{VoxelOctree, VoxelOctreeBranch, OctreePos, BbHit};
+use super::object_octree::{ObjectOctree, ObjectOctreeBranch};
 use super::aabb::Aabb;
 
 #[derive(Debug)]
@@ -15,6 +16,7 @@ pub enum Object {
     Sphere(Sphere),
     Plane(Plane),
     VoxelOctree(VoxelOctree),
+    ObjectOctree(ObjectOctree),
 }
 
 impl Object {
@@ -24,6 +26,7 @@ impl Object {
             Object::Sphere(obj) => obj.hit(ray, t_correction),
             Object::Plane(obj) => obj.hit(ray, t_correction),
             Object::VoxelOctree(obj) => obj.hit(ray, t_correction, rng),
+            Object::ObjectOctree(obj) => obj.hit(ray, t_correction, rng),
         }
     }
 
@@ -33,6 +36,7 @@ impl Object {
             Object::Sphere(obj) => obj.get_aabb(),
             Object::Plane(obj) => obj.get_aabb(),
             Object::VoxelOctree(obj) => obj.get_aabb(),
+            Object::ObjectOctree(obj) => obj.get_aabb(),
         }
     }
 }
@@ -127,9 +131,6 @@ impl Plane {
 }
 
 impl VoxelOctree {
-    // does this need t_correction??
-     // it should not need it ig, cuz hits are only considered if it the vexel in front of the corrent voxel(if already in one)
-     // maybe needed for bbox hit
     #[inline]
     pub fn hit(&self, ray: &Ray, t_correction: f64, rng: &mut Rng) -> Option<RayHitfo> {
         // intersect the Nabb and return if not hit
@@ -439,6 +440,181 @@ impl VoxelOctreeBranch {
     }
 }
 
+impl ObjectOctree {
+
+    // look in voxel_octree for explanation of algorithm
+    // only the differences are commented
+    #[inline]
+    pub fn hit(&self, ray_world_space: &Ray, t_correction: f64, rng: &mut Rng) -> Option<RayHitfo> {
+
+        let ray = Ray::new(self.world_to_tree_space(ray_world_space.pos), ray_world_space.dir);
+        let mut planes = OctreePos::get_rub_masks();
+        let bbox_min = Vec3d::new(-1.0, -1.0, -1.0);
+        let (dt, t0) = {
+            let mut ray = ray.clone();
+            if ray.dir.x < 0.0 {
+                ray.dir.x *= -1.0;
+                ray.pos.x *= -1.0;
+                planes.0 = !planes.0;
+            }
+            if ray.dir.y < 0.0 {
+                ray.dir.y *= -1.0;
+                ray.pos.y *= -1.0;
+                planes.1 = !planes.1;
+            }
+            if ray.dir.z < 0.0 {
+                ray.dir.z *= -1.0;
+                ray.pos.z *= -1.0;
+                planes.2 = !planes.2;
+            }
+            let dt = Vec3d::new(1.0/ray.dir.x, 1.0/ray.dir.y, 1.0/ray.dir.z);
+            let mut t0 = Vec3d::new((bbox_min.x-ray.pos.x)*dt.x, (bbox_min.y-ray.pos.y)*dt.y, (bbox_min.z-ray.pos.z)*dt.z);
+            t0.x = if t0.x.is_nan() {0.0} else if t0.x == f64::NEG_INFINITY {f64::INFINITY} else {t0.x};
+            t0.y = if t0.y.is_nan() {0.0} else if t0.y == f64::NEG_INFINITY {f64::INFINITY} else {t0.y};
+            t0.z = if t0.z.is_nan() {0.0} else if t0.z == f64::NEG_INFINITY {f64::INFINITY} else {t0.z};
+
+            let t0 = (BbHit::new(t0.x, planes.0), BbHit::new(t0.y, planes.1), BbHit::new(t0.z, planes.2));
+            (dt, t0)
+        };
+        { // return if it dosent hit the octree or octree behind the ray origin
+            let t1 = (t0.0+dt.x*2.0, t0.1+dt.y*2.0, t0.2+dt.z*2.0);
+            let min_t1 = math::min_vec(vec![t1.0.t, t1.1.t, t1.2.t]);
+            let max_t0 = math::max_vec(vec![t0.0.t, t0.1.t, t0.2.t]);
+            if max_t0 >= min_t1 {return None}
+            if min_t1 < 0.0 {return None}
+        }
+
+        let t = {
+            let mut t = t0.0;
+            if t.t < t0.1.t {t = t0.1}
+            if t.t < t0.2.t {t = t0.2}
+            t
+        };
+
+        // here sending ray_world_space cuz the hit funcs of objects expect them to be in world space, not tree space
+        self.main_branch.hit(&ray_world_space, t, t0, &dt, t_correction, rng)
+    }
+
+    pub fn get_aabb(&self) -> Aabb {
+        let half_diag = Vec3d::new(self.half_size, self.half_size, self.half_size);
+        Aabb::new(self.center-half_diag, self.center+half_diag)
+    }
+}
+
+impl ObjectOctreeBranch {
+    
+    // look in voxel_octree for explanation of algorithm
+    pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, rng: &mut Rng) -> Option<RayHitfo> {        
+        let tm = (t0.0 + dt.x, t0.1 + dt.y, t0.2 + dt.z);
+        let t1 = (tm.0 + dt.x, tm.1 + dt.y, tm.2 + dt.z);
+        let ts = t.get_next_hits(vec![tm.0, tm.1, tm.2, t1.0, t1.1, t1.2]);
+        let dt_by_2 = *dt*0.5;
+        let entry_child_mask = if tm.0.t < t.t {tm.0.plane} else {!tm.0.plane}
+                             & if tm.1.t < t.t {tm.1.plane} else {!tm.1.plane}
+                             & if tm.2.t < t.t {tm.2.plane} else {!tm.2.plane};
+        
+        // to keep track of the closest hit within this voxel
+        let mut closest = None;
+        let mut min_t = f64::INFINITY;
+        let mut no_further = false; // if one of the subvoxels have something hit, then the next subvoxels are just gonna have a greater t. so skip these
+        
+        if let Some(hitfo) = self.try_hit_subvoxel(entry_child_mask, ray, t, ts[0], t0, dt, &dt_by_2, t_correction, rng) {
+            min_t = hitfo.t;
+            closest = Some(hitfo);
+            no_further = true;
+        }
+        
+        let mut child = entry_child_mask;
+        for i in 0..3 {
+            if no_further {break}
+            match self.get_next_voxel(child, ts[i], t0) {
+                Some(next) => child = next,
+                None => break, // got out of current branch
+            }
+            if let Some(hitfo) = self.try_hit_subvoxel(child, ray, ts[i], ts[i+1], t0, dt, &dt_by_2, t_correction, rng) {
+                if hitfo.t < min_t {
+                    min_t = hitfo.t;
+                    closest = Some(hitfo);        
+                }
+                no_further = true;
+            }
+        }
+
+        // required t = min(objects in curr branch, min(objects in subvoxels))
+        if let Some(hitfo) = self.hit_objects_inside(ray, t_correction, rng) {
+            if hitfo.t < min_t {
+                // min_t = hitfo.t;
+                closest = Some(hitfo);        
+            }
+        }
+        closest
+    }
+
+    #[inline(always)]
+    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, t: BbHit, ts_p1: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, rng: &mut Rng) -> Option<RayHitfo> {
+        if ts_p1.t < t_correction {return None}
+        if child_mask & self.branch_mask > 0 { // check if the voxel is a branch
+            let child = self.get_branch(child_mask);
+            let t0 = self.get_t0_for(child_mask, dt, t0);
+            if let Some(hitfo) = child.hit(ray, t, t0, dt_by_2, t_correction, rng) {
+                return Some(hitfo)
+            }
+        }
+        None
+    }
+
+    // find min(t of objects in this branch)
+    #[inline(always)]
+    fn hit_objects_inside(&self, ray: &Ray, t_correction: f64, rng: &mut Rng) -> Option<RayHitfo> {
+        let mut min_t = f64::INFINITY;
+        let mut closest = None;
+        for obj in &self.objects {
+            if let Some(hitfo) = obj.hit(ray, t_correction, rng) {
+                if hitfo.t < min_t {
+                    min_t = hitfo.t;
+                    closest = Some(hitfo);
+                }
+            }
+        }
+        closest
+    }
+
+    // same as VoxelOctree
+    #[inline(always)]
+    pub fn get_next_voxel(&self, child: u8, t_passed: BbHit, t: (BbHit, BbHit, BbHit)) -> Option<u8> {
+        let planes = (t.0.plane, t.1.plane, t.2.plane);
+        let plane_mask = t_passed.plane;
+        if child & plane_mask > 0 {return None}
+        let mut other_masks = {
+            if plane_mask == planes.0 || plane_mask == !planes.0 {(planes.1, planes.2)}
+            else if plane_mask == planes.1 || plane_mask == !planes.1 {(planes.0, planes.2)}
+            else {(planes.0, planes.1)}
+        };
+        other_masks.0 = if other_masks.0 & child > 0 {other_masks.0} else {!other_masks.0};
+        other_masks.1 = if other_masks.1 & child > 0 {other_masks.1} else {!other_masks.1};
+        let next = plane_mask & other_masks.0 & other_masks.1;
+        Some(next)
+    }
+
+    // same as VoxelOctree
+    #[inline(always)]
+    pub fn get_t0_for(&self, child: u8, dt: &Vec3d, t0: (BbHit, BbHit, BbHit)) -> (BbHit, BbHit, BbHit) {
+        let mut t = t0;
+        if child & t.0.plane > 0 { // right
+            t.0.t += dt.x;
+        } else { // left
+        }
+        if child & t.1.plane > 0 { // up
+            t.1.t += dt.y;
+        } else { // down
+        }
+        if child & t.2.plane > 0 { // back
+            t.2.t += dt.z;
+        } else { // fwd
+        }
+        t
+    }
+}
 
 // refactoring needed for rayhitfo (down)
 
