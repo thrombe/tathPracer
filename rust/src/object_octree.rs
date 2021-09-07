@@ -8,20 +8,20 @@ use super::ray::{Ray, RayHitfo};
 use super::world::Rng;
 
 #[derive(Debug)]
-pub struct WorldOctree {
+pub struct ObjectOctree {
     // entire octree lies in -1 to 1, half_size converts to and from this to world space or whatever
-    half_size: f64,
+    pub half_size: f64,
     pub scale_factor: f64,
-    pub main_branch: WorldOctreeBranch,
+    pub main_branch: ObjectOctreeBranch,
     // ! object octree plz
 }
 
-impl WorldOctree {
+impl ObjectOctree {
     pub fn new(size: f64) -> Self {
         Self {
             half_size: size/2.0,
             scale_factor: 2.0/size,
-            main_branch: WorldOctreeBranch::new(OctreePos::Main),
+            main_branch: ObjectOctreeBranch::new(OctreePos::Main),
         }
     }
 
@@ -56,16 +56,16 @@ impl WorldOctree {
 }
 
 #[derive(Debug)]
-pub struct WorldOctreeBranch {
+pub struct ObjectOctreeBranch {
     // indices of everything can be accessed the same way as VoxelOctree
     pub pos: OctreePos,
     pub child_mask: u8,
     pub branch_mask: u8,
-    pub chilranches: Vec<WorldOctreeBranch>,
+    pub chilranches: Vec<ObjectOctreeBranch>,
     pub objects: Vec<Object>,
 }
 
-impl WorldOctreeBranch { // all branches consider their space as -1 to 1
+impl ObjectOctreeBranch { // all branches consider their space as -1 to 1
     fn new(pos: OctreePos) -> Self {
         Self {
             pos, child_mask: 0, branch_mask: 0, chilranches: Vec::<Self>::new(), objects: Vec::<Object>::new(),
@@ -180,7 +180,7 @@ impl WorldOctreeBranch { // all branches consider their space as -1 to 1
 
 // hit functions below
 
-impl WorldOctree {
+impl ObjectOctree {
 
     // look in voxel_octree for explanation of algorithm
     // only the differences are commented
@@ -236,7 +236,7 @@ impl WorldOctree {
     }
 }
 
-impl WorldOctreeBranch {
+impl ObjectOctreeBranch {
     
     // look in voxel_octree for explanation of algorithm
     pub fn hit(&self, ray: &Ray, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, rng: &mut Rng) -> Option<RayHitfo> {        

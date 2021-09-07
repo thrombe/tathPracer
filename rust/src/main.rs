@@ -14,7 +14,7 @@ mod material;
 mod objects;
 mod scene;
 mod voxel_octree;
-mod world_octree;
+mod object_octree;
 mod aabb;
 
 fn main() {

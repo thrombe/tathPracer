@@ -8,7 +8,7 @@ use super::vec3d::Vec3d;
 use super::world::{World, Camera};
 use super::objects::{Object, Sphere, Plane};
 use super::voxel_octree::{VoxelOctree};
-use super::world_octree::WorldOctree;
+use super::object_octree::ObjectOctree;
 use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 
@@ -29,7 +29,7 @@ fn spheres() -> World {
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        octree: WorldOctree::new(50.0),
+        octree: ObjectOctree::new(50.0),
     };
     
     world.octree.insert_object( // ground
@@ -212,7 +212,7 @@ fn voxel_octree() -> World {
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        octree: WorldOctree::new(100.0),
+        octree: ObjectOctree::new(100.0),
     };
     // world.cam.bouncy_depth = 1000;
 

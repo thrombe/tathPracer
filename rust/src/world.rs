@@ -6,7 +6,7 @@ use super::img;
 use super::ray::{Ray, RayHitfo};
 use super::scene::gen_world;
 use super::material::Material;
-use super::world_octree::WorldOctree;
+use super::object_octree::ObjectOctree;
 
 // use rand::rngs::StdRng;
 // use rand::SeedableRng; // for rng
@@ -191,7 +191,7 @@ pub fn run_world() {
 
 #[derive(Debug)]
 pub struct World {
-    pub octree: WorldOctree, // Vec<Box<dyn hittable>> or enum ?
+    pub octree: ObjectOctree, // Vec<Box<dyn hittable>> or enum ?
     pub cam: Camera,
 }
 
