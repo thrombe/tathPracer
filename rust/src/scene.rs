@@ -6,13 +6,14 @@ use super::vec3d::Vec3d;
 
 use super::world::{World, Camera};
 use super::objects::{Object, Sphere, Plane};
-use super::octree::{Octree};
+use super::voxel_octree::{VoxelOctree};
+use super::world_octree::WorldOctree;
 use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 
 pub fn gen_world() -> World {
-    // scene1()
-    octree_test()
+    scene1()
+    // octree_test()
 }
 
 fn scene1() -> World {
@@ -27,22 +28,22 @@ fn scene1() -> World {
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        objects: Vec::<Object>::new(),
+        octree: WorldOctree::new(100.0),
     };
-
-    world.objects.push( // ground
+    
+    world.octree.insert_object( // ground
         Object::Plane(Plane {
             point: Vec3d::new(0.0, 0.0, 0.0),
             normal: Vec3d::new(0.0, 1.0, 0.0),
             material: Material::Lambertian(Lambertian {
             // material: Material::Metal(Metal {
                 color:Vec3d::new(0.45, 0.3, 0.45),
-                // fuzz: 0.01,
+                // fuzz: 0.01
             }),
         })
     );
     
-    // world.objects.push( // sky
+    // world.octree.insert_object( // sky
     //     Object::Sphere(Sphere {
     //         center: Vec3d::new(0.0, 0.0, 0.0),
     //         radius: 1000.0,
@@ -52,7 +53,7 @@ fn scene1() -> World {
     //         }),
     //     })
     // );
-    // world.objects.push( // sun(ish)
+    // world.octree.insert_object( // sun(ish)
     //     Object::Sphere(Sphere {
     //         center: Vec3d::new(100.0, 100.0, 0.0),
     //         radius: 30.0,
@@ -62,7 +63,7 @@ fn scene1() -> World {
     //     })
     // );
 
-    // world.objects.push( // tilted plane
+    // world.octree.insert_object( // tilted plane
     //     Object::Plane(Plane {
     //         point: Vec3d::new(-15.0, 0.0, 0.0),
     //         normal: Vec3d::new(1.0, -0.4, 0.6),
@@ -76,7 +77,7 @@ fn scene1() -> World {
     //     })
     // );
 
-    world.objects.push( // mid top
+    world.octree.insert_object( // mid top
         Object::Sphere(Sphere {
             center: Vec3d::new(0.0, 3.0, -10.0),
             radius: 1.0,
@@ -85,7 +86,7 @@ fn scene1() -> World {
             }),
         })
     );
-    world.objects.push( // mid
+    world.octree.insert_object( // mid
         Object::Sphere(Sphere {
             center: Vec3d::new(0.0, 1.0, -10.0),
             radius: 1.0,
@@ -95,7 +96,7 @@ fn scene1() -> World {
             }),
         })
     );
-    world.objects.push( // left
+    world.octree.insert_object( // left
         Object::Sphere(Sphere {
             center: Vec3d::new(-2.0, 1.0, -10.0),
             radius: 1.0,
@@ -104,7 +105,7 @@ fn scene1() -> World {
             }),
         })
     );
-    world.objects.push( // left top
+    world.octree.insert_object( // left top
         Object::Sphere(Sphere {
             center: Vec3d::new(-2.0, 3.0, -10.0),
             radius: 1.0,
@@ -114,7 +115,7 @@ fn scene1() -> World {
             }),
         })
     );
-    world.objects.push( // right
+    world.octree.insert_object( // right
         Object::Sphere(Sphere {
             center: Vec3d::new(2.0, 1.0, -10.0),
             radius: 1.0,
@@ -126,18 +127,18 @@ fn scene1() -> World {
             }),
         })
     );
-    world.objects.push( // trying hollow glass sphere
-        Object::Sphere(Sphere {
-            center: Vec3d::new(2.0, 1.0, -10.0),
-            radius: -0.3,
-            material: Material::Dielectric(Dielectric {
-                // color: Vec3d::new(0.44, 0.21, 1.0),
-                color: Vec3d::new(1.0, 1.0, 1.0),
-                refractive_index: 1.5,
-                fuzz: 0.0,
-            }),
-        })
-    );
+    // world.octree.insert_object( // trying hollow glass sphere
+    //     Object::Sphere(Sphere {
+    //         center: Vec3d::new(2.0, 1.0, -10.0),
+    //         radius: -0.3,
+    //         material: Material::Dielectric(Dielectric {
+    //             // color: Vec3d::new(0.44, 0.21, 1.0),
+    //             color: Vec3d::new(1.0, 1.0, 1.0),
+    //             refractive_index: 1.5,
+    //             fuzz: 0.0,
+    //         }),
+    //     })
+    // );
 
     let mut rng = rand::thread_rng();
     let random = Uniform::new(0.0, 1.0);
@@ -150,7 +151,7 @@ fn scene1() -> World {
         let color = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng));
         let threshold = 1.0/4.0; // 4 types of spheres
         if randomiser < threshold {
-            world.objects.push(
+            world.octree.insert_object(
                 Object::Sphere(Sphere {
                     center: center,
                     radius: radius,
@@ -160,7 +161,7 @@ fn scene1() -> World {
                 })
             );    
         } else if randomiser < threshold*2.0 {
-            world.objects.push(
+            world.octree.insert_object(
                 Object::Sphere(Sphere {
                     center: center,
                     radius: radius,
@@ -171,7 +172,7 @@ fn scene1() -> World {
                 })
             );    
         } else if randomiser < threshold*3.0 {
-            world.objects.push(
+            world.octree.insert_object(
                 Object::Sphere(Sphere {
                     center: center,
                     radius: radius,
@@ -183,7 +184,7 @@ fn scene1() -> World {
                 })
             );
         } else {
-            world.objects.push(
+            world.octree.insert_object(
                 Object::Sphere(Sphere {
                     center: center,
                     radius: radius,
@@ -198,7 +199,7 @@ fn scene1() -> World {
     world
 }
 
-
+/*
 fn octree_test() -> World {
 
     let width = 720;
@@ -218,7 +219,7 @@ fn octree_test() -> World {
     // READ NOTES - octree
     // check if reflections work good within octree
 
-    let mut oct = Octree::new(2.0, Some(1));
+    let mut oct = VoxelOctree::new(2.0, Some(1));
     
     let material = Material::Lambertian(Lambertian {
         color: Vec3d::new(0.7, 0.4, 0.7),
@@ -252,7 +253,7 @@ fn octree_test() -> World {
     // let normal = point.clone();
     // oct.insert_voxel(point, 0, material_index2, None);
 
-    world.objects.push(Object::Octree(oct));
+    world.objects.push(Object::VoxelOctree(oct));
 
     // debug rays
     // use super::ray::Ray;
@@ -269,3 +270,4 @@ fn octree_test() -> World {
 
     world
 }
+*/

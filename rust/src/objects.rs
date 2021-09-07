@@ -7,12 +7,14 @@ use super::math;
 use super::material::{Material, Lit};
 use super::ray::{Ray, RayHitfo};
 use super::world::Rng;
-use super::octree::{Octree, OctreeBranch, OctreePos, BbHit};
+use super::voxel_octree::{VoxelOctree, VoxelOctreeBranch, OctreePos, BbHit};
+use super::aabb::Aabb;
 
+#[derive(Debug)]
 pub enum Object {
     Sphere(Sphere),
     Plane(Plane),
-    Octree(Octree),
+    VoxelOctree(VoxelOctree),
 }
 
 impl Object {
@@ -21,11 +23,21 @@ impl Object {
         match self {
             Object::Sphere(obj) => obj.hit(ray, t_correction),
             Object::Plane(obj) => obj.hit(ray, t_correction),
-            Object::Octree(obj) => obj.hit(ray, t_correction, rng),
+            Object::VoxelOctree(obj) => obj.hit(ray, t_correction, rng),
+        }
+    }
+
+    // octree size only cuz the plane has to go inside the main tree? 
+    pub fn get_aabb(&self) -> Aabb {
+        match self {
+            Object::Sphere(obj) => obj.get_aabb(),
+            Object::Plane(obj) => obj.get_aabb(),
+            Object::VoxelOctree(obj) => obj.get_aabb(),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct Sphere {
     pub center: Vec3d,
     pub radius: f64,
@@ -70,8 +82,14 @@ impl Sphere {
     pub fn normal(&self, ray: &Ray) -> Vec3d {
         (ray.pos - self.center).unit()
     }
+
+    pub fn get_aabb(&self) -> Aabb {
+        let half_diag = Vec3d::new(self.radius, self.radius, self.radius);
+        Aabb::new(self.center-half_diag, self.center+half_diag)
+    }
 }
 
+#[derive(Debug)]
 pub struct Plane {
     pub normal: Vec3d,
     pub point: Vec3d,
@@ -100,9 +118,14 @@ impl Plane {
     pub fn normal(&self, ray: &Ray) -> Vec3d {
         if self.normal.dot(ray.dir) < 0.0 {self.normal.unit()} else {self.normal.unit()*(-1.0)}
     }
+
+    #[inline(always)]
+    pub fn get_aabb(&self) -> Aabb {
+        Aabb::new(Vec3d::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY), Vec3d::new(f64::INFINITY, f64::INFINITY, f64::INFINITY))
+    }
 }
 
-impl Octree {
+impl VoxelOctree {
     // does this need t_correction??
      // it should not need it ig, cuz hits are only considered if it the vexel in front of the corrent voxel(if already in one)
      // maybe needed for bbox hit
@@ -186,9 +209,14 @@ impl Octree {
             None
         }
     }
+
+    pub fn get_aabb(&self) -> Aabb {
+        todo!();
+        Aabb::new(Vec3d::zero(), Vec3d::zero())
+    }
 }
 
-impl OctreeBranch {
+impl VoxelOctreeBranch {
     // think about all explanation in this func as if ray.dir.x and y and z > 0
     // the planes are masks of voxels to right/up/down/whatever. so if we "&" multiple of these, we can constrict where the required voxel is
     // eg: let 000 represent x, y, z, so 111 & 010 would mean gimme something (out of 111) that has y = 1 (this makes more sense with u8 but im lazy)
@@ -413,6 +441,7 @@ impl OctreeBranch {
 
 // refactoring needed for rayhitfo (down)
 
+#[derive(Debug)]
 pub struct Triangle {
     vertex_indices: (u32, u32, u32),
     pub normal: Vec3d,
@@ -471,6 +500,7 @@ impl Triangle {
     }
 }
 
+#[derive(Debug)]
 pub struct TriangleMesh {
     vertices: Arc/* or Box?(why rc for something inside a struct)*/<Vec<Vec3d>>, // meshes inside meshes??
     triangles: Arc<Vec<Triangle>>, // NO NEED OF ARCS!! YAY

@@ -5,8 +5,8 @@ use super::img;
 
 use super::ray::{Ray, RayHitfo};
 use super::scene::gen_world;
-use super::objects::{Object};
 use super::material::Material;
+use super::world_octree::WorldOctree;
 
 // use rand::rngs::StdRng;
 // use rand::SeedableRng; // for rng
@@ -22,7 +22,6 @@ pub struct Camera {
     pub bouncy_depth: usize,
     pub samples_per_pixel: usize,
     pub t_correction: f64,
-    pub far_away: f64,
     fov: f64,
     lens_radius: f64,
     pos: Vec3d,
@@ -60,7 +59,6 @@ impl Camera {
             
             // defaults
             t_correction: 0.0000001,
-            far_away: 1000000000.0,
             bouncy_depth: 100,
             cores: 7,
         };
@@ -192,24 +190,14 @@ pub fn run_world() {
 
 
 pub struct World {
-    pub objects: Vec<Object>, // Vec<Box<dyn hittable>> or enum ?
+    pub octree: WorldOctree, // Vec<Box<dyn hittable>> or enum ?
     pub cam: Camera,
 }
 
 impl World {
     #[inline(always)]
     fn hit(&self, ray: &Ray, rng: &mut Rng) -> Option<RayHitfo> {
-        let mut min_t = self.cam.far_away;
-        let mut hit_what = None;
-        for object in &self.objects {
-            if let Some(hitfo) = object.hit(&ray, self.cam.t_correction, rng) {
-                if min_t > hitfo.t {
-                    min_t = hitfo.t;
-                    hit_what = Some(hitfo);
-                }
-            }
-        }
-        hit_what
+        self.octree.hit(ray, self.cam.t_correction, rng)
     }
 
     fn get_ray_color(&self, ray: &mut Ray, bouncy_depth: usize, rng: &mut Rng) -> Vec3d {

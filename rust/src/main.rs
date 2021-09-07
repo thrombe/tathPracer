@@ -13,13 +13,16 @@ mod ray;
 mod material;
 mod objects;
 mod scene;
-mod octree;
+mod voxel_octree;
+mod world_octree;
+mod aabb;
 
 fn main() {
     let now = time::Instant::now();
 
     world::run_world();
     // test();
+    // scene::gen_world();
     
     println!("{:?}", now.elapsed());
 }

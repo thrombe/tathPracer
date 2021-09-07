@@ -7,22 +7,22 @@ use super::material::{Material, Lit};
 use super::math;
 
 #[derive(Debug)]
-pub struct Octree {
+pub struct VoxelOctree {
     // entire octree lies in -1 to 1, half_size converts to and from this to world space or whatever
     half_size: f64,
     pub scale_factor: f64,
-    pub main_branch: OctreeBranch,
+    pub main_branch: VoxelOctreeBranch,
     pub materials: Vec<Material>, // material at 0 index should be some default material for undefined stuff
     pub lod_depth_limit: Option<u16>,
 }
 
-impl Octree {
+impl VoxelOctree {
     pub fn new(size: f64, lod_depth_limit: Option<u16>) -> Self {
         Self {
             lod_depth_limit,
             half_size: size/2.0,
             scale_factor: 2.0/size,
-            main_branch: OctreeBranch::new(OctreePos::Main),
+            main_branch: VoxelOctreeBranch::new(OctreePos::Main),
             materials: vec![Material::Lit(Lit {color: Vec3d::zero()})],
         }
     }
@@ -59,12 +59,12 @@ impl Octree {
 }
 
 #[derive(Debug)]
-pub struct OctreeBranch {
+pub struct VoxelOctreeBranch {
     // children & branch_mask -> branched children, children & !branch_mask -> leafs, children -> live children
     pub pos: OctreePos,
     pub child_mask: u8,
     pub branch_mask: u8, // if branch, the bit is set
-    pub chilranches: Vec<OctreeBranch>, // index -> same as normals but with branch_mask
+    pub chilranches: Vec<VoxelOctreeBranch>, // index -> same as normals but with branch_mask
     pub normal_mask: u8, // this space was being wasted anyway // if set, then this voxel has normal
     pub normals: Vec<Vec3d>, // index -> the index of the voxel in the normal_mask while ignoring 0's,
     // for eg, 01001000(normal_map), normal for 01000000(voxel) is 1 and for 00001000(voxel) is 0
@@ -72,7 +72,7 @@ pub struct OctreeBranch {
     pub materials: Vec<u16>, // index from Octree.materials
 }
 
-impl OctreeBranch { // all branches consider their space as -1 to 1
+impl VoxelOctreeBranch { // all branches consider their space as -1 to 1
     fn new(pos: OctreePos) -> Self {
         Self {
             pos, child_mask: 0, branch_mask: 0, chilranches: Vec::<Self>::new(), normal_mask: 0,
