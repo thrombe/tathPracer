@@ -1,6 +1,14 @@
 
 plan (priority - only a few items here plz):
   . triangle mesh importing and tracing (later can be voxelised)
+  . a stats structure where stats are collected
+    . like how many traversal things per ray/total
+    . how many intersections per ray/total
+    . how?
+      . maybe a global struct + use a macro to either generate no code or the stats code on demand
+        so that it can be witched off when not required
+        . multiple global vars for each kind of stat. so just execute the macro with the var as input for whatever needs stats, and it keeps track
+      . look for some crate?
   . multi-thread syncronised progress indicator
     . what can i do to not slow this down?
       . maybe use channels?
@@ -10,14 +18,27 @@ plan (priority - only a few items here plz):
   . add readme with pics and submit it in rt1wk implimentations
 
 currently working on:
+  . object octree
+    . this is very slow for the sphere scene
+      . the non-octree version takes about 40 sec for ~~90 spheres and 400+ seconds for ~~900 spheres
+      . the octree version takes about 70-90 secs for ~~90 spheres and 200+ secs for ~~900 spheres
+      . but why should it be slow? 90 sphere intersection tests per ray shot vs less than 90 octree traversals(this is kinda efficient too)
+      . try a run with just 1 object in main branch/very inner branch
+        . 9 sec for 1 obj to 35 sec for 1 object
+    . maybe store everything in tree space? so scaling and rotations are easier
   . triangle meshes
     . keep position in struct, we can move objects without having to modify all vertices using it
       . ray pos -= position
       . will also have to keep a matrix to rotate the ray dir correctly
       . this isnt very efficient for static scenes tho cuz we dont need to move objects often
-    . oct-tree
-        . store a triangle in the smallest cube it fits in, dosent matter if its a leaf or branch
-          . this way, no duplicates
+    . store mesh in octree
+      . store a triangle in the smallest cube it fits in, dosent matter if its a leaf or branch
+        . this way, no duplicates
+      . how do i store vertices?
+        . duplicate it across triangles?
+        . if storing in a vec in TriangleMesh, how do i let the triangle have access to it from inside octree.hit
+          . use a global variable which is pointer to the vertices vec. this is unsafe, but whatever
+          . or duplicate the octree once more? for the specifics of triangles
   . how voxelise triangle meshes?
     . triangle meshes are closed usually, so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
       . the interior can have big voxels
@@ -53,6 +74,10 @@ currently working on:
 
 
 todo/ideas:
+  . size of object enum is very big
+    . voxel octree contributes the most
+      . maybe have a info struct or something that is stored in the main struct in a box
+    . maybe use Box<dyn trait> instead?
   . multiple samples if material is lambertian ????
   . multi-colored materials (all types?)
     . an extra enum for this? - it can have all the different coloring patterns in it
