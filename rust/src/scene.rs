@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+#![allow(unused_imports)]
 
 use rand::distributions::{Uniform, Distribution};
 use std::f64::consts::PI;
@@ -9,12 +10,14 @@ use super::world::{World, Camera};
 use super::objects::{Object, Sphere, Plane};
 use super::voxel_octree::{VoxelOctree};
 use super::object_octree::ObjectOctree;
+use super::triangle_octree::{Triangle, TriangleOctree};
 use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
 
 
 pub fn gen_world() -> World {
-    spheres()
+    // spheres()
     // voxel_octree()
+    triangle_octree()
 }
 
 fn spheres() -> World {
@@ -264,6 +267,42 @@ fn voxel_octree() -> World {
     //         }
     //     }
     // }
+
+    world
+}
+
+fn triangle_octree() -> World {
+
+    let width = 720;
+    let height = 480;
+    let fov = PI/3.0;
+    let samples_per_pixel = 100;
+    let aperture = 0.0;
+    let cam_position = Vec3d::new(1.3, 0.7, 4.0);
+    let look_at = Vec3d::new(0.0, 0.0, 0.0);
+
+    let mut world = World {
+        cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
+        octree: ObjectOctree::new(Vec3d::zero(), 100.0),
+    };
+
+    let mut oct = TriangleOctree::new(Vec3d::zero(), 50.0);
+    
+    let material = Material::Lambertian(Lambertian {
+        color: Vec3d::new(0.7, 0.4, 0.7),
+    });
+    let material_index = oct.add_material(material);
+
+    oct.vertices.push(Vec3d::new(-1.0, 1.0, 0.0));
+    oct.vertices.push(Vec3d::new(1.0, 1.0, 0.0));
+    oct.vertices.push(Vec3d::new(0.0, -1.0, 0.0));
+    oct.insert_triangle(Triangle {
+        vertex_indices: (0, 1, 2),
+        material_index: material_index,
+        normal: Vec3d::new(0.0, 0.0, 1.0),
+    });
+
+    world.octree.insert_object(Object::TriangleOctree(oct));
 
     world
 }

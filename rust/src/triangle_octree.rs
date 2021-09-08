@@ -1,45 +1,55 @@
 
 use super::vec3d::Vec3d;
 use super::voxel_octree::{OctreePos};
-use super::objects::Object;
 use super::aabb::Aabb;
+use super::material::Material;
 
 #[derive(Debug)]
-pub struct ObjectOctree {
+pub struct TriangleOctree {
     // entire octree lies in -1 to 1, half_size converts to and from this to world space or whatever
     pub half_size: f64,
     pub scale_factor: f64,
     pub center: Vec3d,
-    pub main_branch: ObjectOctreeBranch,
+    pub main_branch: TriangleOctreeBranch,
+    pub materials: Vec<Material>,
+    pub vertices: Vec<Vec3d>,
 }
 
-impl ObjectOctree {
+impl TriangleOctree {
     pub fn new(center:Vec3d, size: f64) -> Self {
         Self {
             half_size: size/2.0,
             scale_factor: 2.0/size,
             center,
-            main_branch: ObjectOctreeBranch::new(OctreePos::Main),
+            main_branch: TriangleOctreeBranch::new(OctreePos::Main),
+            materials: Vec::<Material>::new(),
+            vertices: Vec::<Vec3d>::new(),
         }
     }
 
-    pub fn insert_object(&mut self, object: Object) {
-        let aabb = object.get_aabb();
+    // object replaces with triangle (pretty much)
+    pub fn insert_triangle(&mut self, triangle: Triangle) {
+        let aabb = triangle.get_aabb(triangle.get_vertices(&self.vertices));
         if aabb.min.x == f64::NEG_INFINITY && aabb.max.y == f64::INFINITY { // for planes and stuff
-            self.main_branch.objects.push(object);
+            self.main_branch.triangles.push(triangle);
             return
         }
         let tree_aabb = Aabb::new(Vec3d::new(-self.half_size, -self.half_size, -self.half_size), Vec3d::new(self.half_size, self.half_size, self.half_size));
         if !(tree_aabb.contains(&aabb)) {
-            dbg!(&object);
-            panic!("object out of tree");
+            dbg!(&triangle);
+            panic!("triangle out of tree");
         }
-        self.main_branch.insert_object(object, aabb*self.scale_factor);
+        self.main_branch.insert_triangle(triangle, aabb*self.scale_factor);
     }
 }
 
 // the methods which are exact copy of voxel_octree
-impl ObjectOctree {
+impl TriangleOctree {
+
+    pub fn add_material(&mut self, material: Material) -> u16 {
+        self.materials.push(material);
+        (self.materials.len()-1) as u16
+    }
 
     #[inline(always)]
     pub fn world_to_tree_space(&self, pos: Vec3d) -> Vec3d {
@@ -57,23 +67,60 @@ impl ObjectOctree {
     }
 }
 
+
 #[derive(Debug)]
-pub struct ObjectOctreeBranch {
+pub struct Triangle {
+    pub vertex_indices: (u32, u32, u32),
+    pub material_index: u16,
+    pub normal: Vec3d,
+}
+
+impl Triangle {
+    pub fn get_vertices<'a>(&self, vertices: &'a Vec<Vec3d>) -> (&'a Vec3d, &'a Vec3d, &'a Vec3d) {
+        (&vertices[self.vertex_indices.0 as usize], &vertices[self.vertex_indices.1 as usize], &vertices[self.vertex_indices.2 as usize])
+    }
+
+    pub fn get_material(&self, materials: &Vec<Material>) -> Material {
+        materials[self.material_index as usize].clone()
+    }
+}
+
+#[derive(Debug)]
+pub struct TriangleOctreeBranch {
     // indices of everything can be accessed the same way as VoxelOctree
     pub pos: OctreePos,
     pub child_mask: u8,
     pub branch_mask: u8,
-    pub chilranches: Vec<ObjectOctreeBranch>,
-    pub objects: Vec<Object>,
+    pub chilranches: Vec<TriangleOctreeBranch>,
+    pub triangles: Vec<Triangle>,
 }
 
-impl ObjectOctreeBranch { // all branches consider their space as -1 to 1
+// methods same as object_octree but triangle instead of object
+impl TriangleOctreeBranch { // all branches consider their space as -1 to 1
     fn new(pos: OctreePos) -> Self {
         Self {
-            pos, child_mask: 0, branch_mask: 0, chilranches: Vec::<Self>::new(), objects: Vec::<Object>::new(),
+            pos, child_mask: 0, branch_mask: 0, chilranches: Vec::<Self>::new(), triangles: Vec::<Triangle>::new(),
         }
     }
 
+    fn insert_triangle(&mut self, triangle: Triangle, aabb: Aabb) {
+        let mut child_mask = 1;
+        for _ in 0..8 {
+            let pos = OctreePos::new(child_mask);
+            if self.child_aabb(pos).contains(&aabb) {
+                let aabb2 = (aabb-self.get_branch_coord(pos))*2.0;
+                let branch = self.add_or_get_branch(child_mask);
+                branch.insert_triangle(triangle, aabb2);
+                return
+            }
+            child_mask *= 2;
+        }
+        self.triangles.push(triangle);
+    }
+}
+
+// methods same as object_octree
+impl TriangleOctreeBranch {
     #[inline(always)]
     fn self_aabb(&self) -> Aabb {
         Aabb::new(Vec3d::new(-1.0, -1.0, -1.0), Vec3d::new(1.0, 1.0, 1.0))
@@ -84,21 +131,6 @@ impl ObjectOctreeBranch { // all branches consider their space as -1 to 1
         let p5 = Vec3d::new(0.5, 0.5, 0.5);
         let c = self.get_branch_coord(pos);
         Aabb::new(c-p5, c+p5)
-    }
-
-    fn insert_object(&mut self, object: Object, aabb: Aabb) {
-        let mut child_mask = 1;
-        for _ in 0..8 {
-            let pos = OctreePos::new(child_mask);
-            if self.child_aabb(pos).contains(&aabb) {
-                let aabb2 = (aabb-self.get_branch_coord(pos))*2.0;
-                let branch = self.add_or_get_branch(child_mask);
-                branch.insert_object(object, aabb2);
-                return
-            }
-            child_mask *= 2;
-        }
-        self.objects.push(object);
     }
 
     fn add_or_get_branch(&mut self, pos_mask: u8) -> &mut Self {
@@ -125,7 +157,7 @@ impl ObjectOctreeBranch { // all branches consider their space as -1 to 1
 }
 
 // the methods which are exact copy of voxel_octree
-impl ObjectOctreeBranch {
+impl TriangleOctreeBranch {
 
     // bias towards +ve direction(if on line)
     fn get_pos_from_point(&self, point: &Vec3d) -> OctreePos {

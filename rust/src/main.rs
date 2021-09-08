@@ -15,6 +15,7 @@ mod objects;
 mod scene;
 mod voxel_octree;
 mod object_octree;
+mod triangle_octree;
 mod aabb;
 
 fn main() {
@@ -27,14 +28,14 @@ fn main() {
     println!("{:?}", now.elapsed());
 }
 
-/*
 pub fn test() {
-    use vec3d::Vec3d;
-    use ray::Ray;
-    use octree::{Octree};
-    // use std::mem::size_of;
+    // use vec3d::Vec3d;
+    // use ray::Ray;
+    // use octree::{Octree};
+    use std::mem::size_of;
     // println!("{:?}", 5.0/0.0  > 10000.0);
-    // println!("{:?}", size_of::<Vec<f64>>());
+    println!("{:?}", size_of::<Vec<f64>>());
+    /*
     let mut oct = Octree::new(2.0, None);
     let point = Vec3d::new(-0.125, -0.125, -0.125);
     // oct.insert_voxel(point, 0);
@@ -49,6 +50,5 @@ pub fn test() {
     println!("");
     let hitfo = oct.hit(&ray, 0.00001);
     println!("{:?}", hitfo);
-    
+    */
 }
-*/
