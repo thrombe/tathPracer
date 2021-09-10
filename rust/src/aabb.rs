@@ -2,6 +2,7 @@
 
 use super::vec3d::Vec3d;
 
+#[derive(Debug)]
 pub struct Aabb { // axis aligned bounding box
     pub min: Vec3d,
     pub max: Vec3d,

@@ -273,20 +273,21 @@ fn voxel_octree() -> World {
 
 fn triangle_octree() -> World {
 
-    let width = 720;
-    let height = 480;
+    let res_mul = 2;
+    let width = 720*res_mul;
+    let height = 480*res_mul;
     let fov = PI/3.0;
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 10;
     let aperture = 0.0;
-    let cam_position = Vec3d::new(1.3, 4.0, 6.0);
-    let look_at = Vec3d::new(0.0, 1.1, 0.0);
+    let cam_position = Vec3d::new(0.0, 0.7, 1.5);
+    let look_at = Vec3d::new(0.0, 0.4, 0.0);
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        octree: ObjectOctree::new(Vec3d::zero(), 10.0),
+        octree: ObjectOctree::new(Vec3d::zero(), 2.0),
     };
 
-    let mut oct = TriangleOctree::new(Vec3d::zero(), 10.0);
+    let mut oct = TriangleOctree::new(Vec3d::zero(), 2.0);
     
     let material = Material::Lambertian(Lambertian {
     // let material = Material::Dielectric(Dielectric {
@@ -301,7 +302,7 @@ fn triangle_octree() -> World {
 
     world.octree.insert_object(
         // Object::TriangleOctree(oct)
-        Object::VoxelOctree(oct.voxelise(7, true))
+        Object::VoxelOctree(oct.voxelise(7, !true))
     );
 
     world

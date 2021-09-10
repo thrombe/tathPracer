@@ -1,6 +1,5 @@
 
 plan (priority - only a few items here plz):
-  /. triangle mesh importing and tracing (later can be voxelised)
   . voxelisation
     . BUG!!!!
       . metal reflection causes wierd black voxelsb(if normals come from triangles)
@@ -25,6 +24,14 @@ plan (priority - only a few items here plz):
   . add readme with pics and submit it in rt1wk implimentations
 
 currently working on:
+  . importing objects
+    . add support for colors through .obj fields
+    . support for voxel based files? magicavoxel or something
+  . object manupulation
+    . add rotations and stuff to triangleOctree
+      . rotate the model in triangle form so that it can be voxelised after rotations
+    . a method to expand the octree and shrink the current voxels to a smaller part (maybe 1 octant)
+    . ways to combine multiple triangle meshes into one conviniently
   . object octree
     . this is very slow for the sphere scene
       . the non-octree version takes about 40 sec for ~~90 spheres and 400+ seconds for ~~900 spheres
@@ -47,7 +54,7 @@ currently working on:
           . use a global variable which is pointer to the vertices vec. this is unsafe, but whatever
           . or duplicate the octree once more? for the specifics of triangles
   . how voxelise triangle meshes?
-    . triangle meshes are closed usually, so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
+    . triangle meshes are closed usually(nope), so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
       . the interior can have big voxels
     . maybe voxels can be filled like rasterisation. move a point along the area of triangle and put a voxel there
       . for more accurate things, insert the point a few more levels deep and check if it lies closeish to the centre or lies along boundaries

@@ -36,7 +36,7 @@ impl TriangleOctree {
         }
         let tree_aabb = Aabb::new(Vec3d::new(-self.half_size, -self.half_size, -self.half_size), Vec3d::new(self.half_size, self.half_size, self.half_size));
         if !(tree_aabb.contains(&aabb)) {
-            dbg!(&triangle);
+            dbg!(&triangle, &aabb, &tree_aabb);
             panic!("triangle out of tree");
         }
         self.main_branch.insert_triangle(triangle, aabb*self.scale_factor);
