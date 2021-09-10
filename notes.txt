@@ -1,6 +1,13 @@
 
 plan (priority - only a few items here plz):
-  . triangle mesh importing and tracing (later can be voxelised)
+  /. triangle mesh importing and tracing (later can be voxelised)
+  . voxelisation
+    . BUG!!!!
+      . metal reflection causes wierd black voxelsb(if normals come from triangles)
+      . its partly because of how the metal.scatter works. if normal.raydir isnt -ve then it returns None.
+        but patching this dosent help too much either. also a part of reason is that after reflection, the rays hit other voxels
+        but between the current voxel and the voxel next to it.
+        . the second porblem can be handled by another ray hit implimentation like the transparent one, but this is ugly.
   . a stats structure where stats are collected
     . like how many traversal things per ray/total
     . how many intersections per ray/total
@@ -50,6 +57,9 @@ currently working on:
     . find bb and sample 8 points within a voxel to decide if it should be filled
       either every voxel.in this can be checked (recursive) (cuz simpler)
       or only check (recursive) that actually intersect
+    . use triangle normal to see if a voxel is in or out. go through each voxel in the bb of the triangle and force set each voxel to air/solid
+      depending on if its in or out. do this for every triangle and if the model is leak proof, it should give goodish results maybe
+      . some bbs might be bigger than its surrounding bbs, so it might leave residue
   . octree
     . voxel normals
       . many voxels can have same normal (big triangle), can i do something to save space here?

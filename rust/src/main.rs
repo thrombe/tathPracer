@@ -17,6 +17,7 @@ mod voxel_octree;
 mod object_octree;
 mod triangle_octree;
 mod aabb;
+mod obj_importing;
 
 fn main() {
     let now = time::Instant::now();
@@ -29,26 +30,11 @@ fn main() {
 }
 
 pub fn test() {
+    // use std::mem::size_of;
+    // println!("{:?}", size_of::<Vec<f64>>());
     // use vec3d::Vec3d;
-    // use ray::Ray;
-    // use octree::{Octree};
-    use std::mem::size_of;
-    // println!("{:?}", 5.0/0.0  > 10000.0);
-    println!("{:?}", size_of::<Vec<f64>>());
-    /*
-    let mut oct = Octree::new(2.0, None);
-    let point = Vec3d::new(-0.125, -0.125, -0.125);
-    // oct.insert_voxel(point, 0);
-    // println!("{:?}", oct);
-    println!("");
-    let at = Vec3d::new(-1.5, -0.125, -0.125);
-    // let at = point;
-    // let pos = Vec3d::new(0.0, 0.0, 3.503);
-    let pos = Vec3d::new(-0.123, -0.126, 3.0);
-    let ray = Ray::new(pos, (at-pos).unit());
-    println!("{:?}", ray);
-    println!("");
-    let hitfo = oct.hit(&ray, 0.00001);
-    println!("{:?}", hitfo);
-    */
+    // use triangle_octree::TriangleOctree;
+    // let mut oct = TriangleOctree::new(Vec3d::zero(), 100.0);
+    // oct.import_from_obj("../../0builds/objects/axis.obj", 0);
+    // dbg!(oct);
 }

@@ -1,8 +1,8 @@
 
 use super::vec3d::Vec3d;
-use super::voxel_octree::{OctreePos};
+use super::voxel_octree::{VoxelOctree, OctreePos};
 use super::aabb::Aabb;
-use super::material::Material;
+use super::material::{Material, Lit};
 
 #[derive(Debug)]
 pub struct TriangleOctree {
@@ -22,7 +22,7 @@ impl TriangleOctree {
             scale_factor: 2.0/size,
             center,
             main_branch: TriangleOctreeBranch::new(OctreePos::Main),
-            materials: Vec::<Material>::new(),
+            materials: vec![Material::Lit(Lit {color: Vec3d::zero()})],
             vertices: Vec::<Vec3d>::new(),
         }
     }
@@ -40,6 +40,58 @@ impl TriangleOctree {
             panic!("triangle out of tree");
         }
         self.main_branch.insert_triangle(triangle, aabb*self.scale_factor);
+    }
+
+    pub fn voxelise(self, octree_depth: usize, normal_from_triangle: bool) -> VoxelOctree {
+        let mut triangles = vec!();
+
+        // navigate across all nodes and create a vec of all triangles
+        let mut stack = vec!();
+        stack.push(&self.main_branch);
+        while !stack.is_empty() {
+            let branch = stack.pop().unwrap();
+            for triangle in &branch.triangles {
+                triangles.push(triangle);
+            }
+            let mut child_mask = 1;
+            for _ in 0..8 {
+                if branch.child_mask & child_mask > 0 {
+                    stack.push(branch.get_branch(child_mask));
+                }
+                child_mask *= 2;
+            }
+        }
+
+        let mut vot = VoxelOctree::new(self.center, self.half_size*2.0, None);
+        vot.materials = self.materials.clone();
+        for triangle in triangles {
+            // algorithm is just to sample points covering the surface of triangle and putting a voxel there
+            // barycentric coords are pretty handy here
+            let vertices = triangle.get_vertices(&self.vertices);
+            let v0 = *vertices.0;
+            let v10 = *vertices.1-v0;
+            let v20 = *vertices.2-v0;
+            let normal = if normal_from_triangle {Some(triangle.normal)} else {None};
+            let voxel_side = self.half_size*(2.0f64.powf(-(octree_depth as f64)));
+            let dw1 = 0.5*voxel_side/v10.size(); // 0.5 to eliminate holes. maybe 0.7 or something could work too idk.
+            let dw2 = 0.5*voxel_side/v20.size();
+            let mut w1 = 1.0;
+            while w1 >= 0.0 {
+                let mut w2 = 0.0;
+                while w2 <= 1.0-w1 {
+                    let point = v0 + v10*w1 + v20*w2;
+                    vot.insert_voxel(point, octree_depth, triangle.material_index, normal);
+
+                    w2 += dw2;
+                }
+                // let point = v0 + v10*w1 + v20*(1.0-w1);
+                // vot.insert_voxel(point, octree_depth, triangle.material_index, normal);
+
+                w1 -= dw1;
+            }
+        }
+
+        vot
     }
 }
 

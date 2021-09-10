@@ -278,31 +278,31 @@ fn triangle_octree() -> World {
     let fov = PI/3.0;
     let samples_per_pixel = 100;
     let aperture = 0.0;
-    let cam_position = Vec3d::new(1.3, 0.7, 4.0);
-    let look_at = Vec3d::new(0.0, 0.0, 0.0);
+    let cam_position = Vec3d::new(1.3, 4.0, 6.0);
+    let look_at = Vec3d::new(0.0, 1.1, 0.0);
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        octree: ObjectOctree::new(Vec3d::zero(), 100.0),
+        octree: ObjectOctree::new(Vec3d::zero(), 10.0),
     };
 
-    let mut oct = TriangleOctree::new(Vec3d::zero(), 50.0);
+    let mut oct = TriangleOctree::new(Vec3d::zero(), 10.0);
     
     let material = Material::Lambertian(Lambertian {
-        color: Vec3d::new(0.7, 0.4, 0.7),
-    });
+    // let material = Material::Dielectric(Dielectric {
+    // let material = Material::Metal(Metal {
+            color: Vec3d::new(0.7, 0.4, 0.7),
+            // refractive_index: 1.3,
+            // fuzz: 0.0,
+        });
     let material_index = oct.add_material(material);
+    
+    oct.import_from_obj("../../0builds/objects/teapot.obj", material_index);
 
-    oct.vertices.push(Vec3d::new(-1.0, 1.0, 0.0));
-    oct.vertices.push(Vec3d::new(1.0, 1.0, 0.0));
-    oct.vertices.push(Vec3d::new(0.0, -1.0, 0.0));
-    oct.insert_triangle(Triangle {
-        vertex_indices: (0, 1, 2),
-        material_index: material_index,
-        normal: Vec3d::new(0.0, 0.0, 1.0),
-    });
-
-    world.octree.insert_object(Object::TriangleOctree(oct));
+    world.octree.insert_object(
+        // Object::TriangleOctree(oct)
+        Object::VoxelOctree(oct.voxelise(7, true))
+    );
 
     world
 }

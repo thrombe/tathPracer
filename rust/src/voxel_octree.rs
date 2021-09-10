@@ -38,7 +38,10 @@ impl VoxelOctree {
     pub fn insert_voxel(&mut self, mut point: Vec3d, depth: usize, material_index: u16, normal: Option<Vec3d>) {
         point = self.world_to_tree_space(point);
         let transparency = if let Material::Dielectric(_) = self.materials[material_index as usize] {true} else {false};
-        if (point.x.abs() > 1.0) || (point.y.abs() > 1.0) || (point.z.abs() > 1.0) {panic!()}
+        if (point.x.abs() > 1.0) || (point.y.abs() > 1.0) || (point.z.abs() > 1.0) {
+            dbg!(point);
+            panic!("point outside tree");
+        }
         self.main_branch.insert_voxel_from_point(point, depth, material_index, normal, transparency);
     }
 
