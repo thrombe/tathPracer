@@ -1,12 +1,16 @@
 
-plan (priority - only a few items here plz):
-  . voxelisation
-    . BUG!!!!
-      . metal reflection causes wierd black voxelsb(if normals come from triangles)
+plan:
+  . BUGS!!!!
+    . metal reflection causes wierd black voxelsb(if normals come from triangles)
       . its partly because of how the metal.scatter works. if normal.raydir isnt -ve then it returns None.
         but patching this dosent help too much either. also a part of reason is that after reflection, the rays hit other voxels
         but between the current voxel and the voxel next to it.
         . the second porblem can be handled by another ray hit implimentation like the transparent one, but this is ugly.
+        . maybe can solve with different material implementation for voxels -> metalVoxel
+      . same for dielectric
+      . try making a sphere with voxels. maybe the normals of triangles makes it worse
+    . when camera is right on a face of voxelOctree, things dont render correctly
+      . observed with oldMan model at 1.0 z when octree was 2.0 sized
   . a stats structure where stats are collected
     . like how many traversal things per ray/total
     . how many intersections per ray/total
@@ -48,11 +52,11 @@ currently working on:
     . store mesh in octree
       . store a triangle in the smallest cube it fits in, dosent matter if its a leaf or branch
         . this way, no duplicates
-      . how do i store vertices?
-        . duplicate it across triangles?
-        . if storing in a vec in TriangleMesh, how do i let the triangle have access to it from inside octree.hit
-          . use a global variable which is pointer to the vertices vec. this is unsafe, but whatever
-          . or duplicate the octree once more? for the specifics of triangles
+      \. how do i store vertices?
+        \. duplicate it across triangles?
+        \. if storing in a vec in TriangleMesh, how do i let the triangle have access to it from inside octree.hit
+          \. use a global variable which is pointer to the vertices vec. this is unsafe, but whatever
+          \. or duplicate the octree once more? for the specifics of triangles
   . how voxelise triangle meshes?
     . triangle meshes are closed usually(nope), so maybe first voxelize every voxel that intersects triangles and then flood-fill the interior
       . the interior can have big voxels
@@ -95,7 +99,12 @@ todo/ideas:
     . voxel octree contributes the most
       . maybe have a info struct or something that is stored in the main struct in a box
     . maybe use Box<dyn trait> instead?
-  . multiple samples if material is lambertian ????
+  . different way of collecting color
+    . travelling through smoke- some amount of every ray is bounces cuz of the partiles in air, some passes through
+      maybe this way so many rays are not needed ? idk
+    . transparent surface - some part of ray is reflected and some is refracted
+    . matt surfsces - send multiple rays from where the ray hit the surface and collect color this way
+    . this way, the spp can be low and materials can decide how the color is contributed
   . multi-colored materials (all types?)
     . an extra enum for this? - it can have all the different coloring patterns in it
     . this will look cool on random objects (like the velvet coats or whatever)
@@ -106,6 +115,7 @@ todo/ideas:
   . make this do the termiRen stuff too
     . dosent seem to difficult - just modify the world struct a bit
   . look into signed distance fields
+  . 3d fractals using distance estimate funcs for mandlebulb etc
   . more materials
     . textures
       . custom textured skybox - just another sphere??
@@ -115,13 +125,13 @@ todo/ideas:
         . with different settings
     . hollowgram like material
     . is sub-surface scatterng doable for me?
+  . create custom 360 images by rendering a scene on a sphere (reverse of looking up testures for sphere)
   . fog
     . get 2 limits for t (where there is fog)
     . some probability that it passes/interacts depending on t
     . if interacts, pick some t in the range
     . let it bounce in random direction
     . use voxels? - more ideas in "octree" below
-  . 3d fractals using distance estimate funcs for mandlebulb etc
   . a portal
     . maybe any shape + coupled objects
       . different ways the ray comes out
@@ -138,6 +148,7 @@ todo/ideas:
       . m_t_s1 < p_t_s2 where s1 is the sphere further away from ray.pos
         how? -> whenever ray intersects both, it will (mostly) have 4 sols
         so just pick the middle 2  (m_t is ((-b-root(D))/4a) and p_t is -b+rootD...)
+      . make a torch -> lens + lit sphere at focus
     . parabolic/spherical surfaces
   . implement the 3d matrix rotations stuff
     . maybe the current stuff is plenty for this
@@ -146,5 +157,12 @@ todo/ideas:
     . 3d images? (assigning colors to 3d pixels) can i do anything with this?
       . average the colors down to 2d
     . 2d images?
+  . point clouds
+    . 1 point can be represented by 3^n bits where n is the depth level in an octree
+    . 000 means ldf and 111 means rub
+    . a single point requires 63 bits for 0.5 cubic mm accuracy in a cubic km volume - 21 octree levels
+      17 M points in 1 GB without compression
+      . easy compression - the starting bits of points in a similar region dont need to be stored seperately
+    . is this worse than a direct svo dump tho?
 
 remember:
