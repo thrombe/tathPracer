@@ -11,6 +11,7 @@ use super::world::Rng;
 pub enum Material {
     Lambertian(Lambertian),
     Metal(Metal),
+    MetalVoxel(MetalVoxel), // this is needed cuz the voxels need a bit different behaviour when they have custom normals
     Dielectric(Dielectric),
     Lit(Lit), // this can be used as lit if color is greater than 1 and as flat colored stuff if color < 1 (black body if color = 0)
 }
@@ -22,6 +23,12 @@ pub struct Lambertian {
 
 #[derive(Debug, Clone)]
 pub struct Metal {
+    pub color: Vec3d,
+    pub fuzz: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct MetalVoxel {
     pub color: Vec3d,
     pub fuzz: f64,
 }
@@ -55,6 +62,16 @@ impl Material {
                 let a = ray.dir.unit();
                 let mut reflected = a - *normal*2.0*a.dot(*normal);
                 if reflected.dot(*normal) < 0.0 {return None}
+                reflected += Vec3d::new(rand.sample(rng), rand.sample(rng), rand.sample(rng))*obj.fuzz;
+                Some(Ray::new(ray.pos, reflected))
+            },
+            Material::MetalVoxel(obj) => {
+                let a = ray.dir.unit();
+                let b = *normal*2.0*a.dot(*normal);
+                let mut reflected = a - b;
+                if reflected.dot(*normal) < 0.0 {
+                    reflected = a+b;
+                }
                 reflected += Vec3d::new(rand.sample(rng), rand.sample(rng), rand.sample(rng))*obj.fuzz;
                 Some(Ray::new(ray.pos, reflected))
             },
@@ -107,6 +124,7 @@ impl Material {
         match self {
             Material::Lambertian(obj) => &obj.color,
             Material::Metal(obj) => &obj.color,
+            Material::MetalVoxel(obj) => &obj.color,
             Material::Dielectric(obj) => &obj.color,
             Material::Lit(obj) => &obj.color,
         }

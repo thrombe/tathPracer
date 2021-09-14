@@ -201,6 +201,16 @@ impl VoxelOctree {
                 if let Some(hitfo1) = self.main_branch.hit_transparent(&ray, &self.materials, t, 0.0, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1), material_index, rng) {
                     hitfo.0 = hitfo1;
                 }
+            } else if let Some(material_index) = hitfo.2 { // reflection bad case
+                if let Some(hitfo1) = self.main_branch.hit_reflective(&ray, &self.materials, t, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1), material_index) {
+                    // return None;
+                    let t = t-hitfo1.t;
+                    let t0 = (t0.0-hitfo1.t, t0.1-hitfo1.t, t0.2-hitfo1.t);
+                    // checking ig the ray hits something else in the same octree
+                    if let Some(hitfo2) = self.main_branch.hit(&hitfo1.ray, &self.materials, t, t0, &dt, t_correction, self.lod_depth_limit.map(|x| x+1)) { // +1 to get this depth and insert depth in same level
+                        hitfo.0 = hitfo2.0;
+                    } else {return None}
+                } else {return None}
             }
 
             hitfo.0.ray.pos = self.tree_to_world_space(hitfo.0.ray.pos);
@@ -223,7 +233,7 @@ impl VoxelOctreeBranch {
 
     // dt is current branch's (t1-t0)/2
     // in the return type, the u16 is material_index, and the bool inficates whether the ray.pos is inside a transparent voxel or not
-    pub fn hit(&self, ray: &Ray, materials: &Vec<Material>, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>) -> Option<(RayHitfo, Option<u16>)> {
+    pub fn hit(&self, ray: &Ray, materials: &Vec<Material>, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>) -> Option<(RayHitfo, Option<u16>, Option<u16>)> {
         // dbg!(self.pos);
 
         depth = depth.map(|x| x-1);        
@@ -263,7 +273,7 @@ impl VoxelOctreeBranch {
     }
 
     #[inline(always)]
-    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, materials: &Vec<Material>, t: BbHit, ts_p1: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>) -> Option<(RayHitfo, Option<u16>)> {
+    pub fn try_hit_subvoxel(&self, child_mask: u8, ray: &Ray, materials: &Vec<Material>, t: BbHit, ts_p1: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>) -> Option<(RayHitfo, Option<u16>, Option<u16>)> {
         if ts_p1.t < t_correction {return None} // since ts > t and ts < 0 -> this voxel is completely behind the ray, so no need to enter
         if depth != Some(0) && child_mask & self.branch_mask > 0 { // check if the voxel is a branch
             let child = self.get_branch(child_mask);
@@ -273,16 +283,19 @@ impl VoxelOctreeBranch {
             }
         } else if child_mask & self.child_mask > 0 { // check if leaf
             if t.t < t_correction { // if ray originates from somewhere in octree, we need to ignore -ve t. but we cant ignore the non-leaves if t -ve for them
+                let material_index = self.get_material_index(child_mask);
                 if self.transparency_mask & child_mask > 0 && ts_p1.t > t_correction { // this means ray originates from inside a transparent voxel thing
-                    let material_index = self.get_material_index(child_mask);
                     let hitfo = self.submit_hitfo(ray, materials, BbHit::new(0.0, t.plane), child_mask, false, material_index);
-                    return Some((hitfo, Some(material_index)))
+                    return Some((hitfo, Some(material_index), None))
+                } else if let Material::MetalVoxel(_) = materials[material_index as usize] {
+                    let hitfo = self.submit_hitfo(ray, materials, BbHit::new(0.0, t.plane), child_mask, false, material_index);
+                    return Some((hitfo, None, Some(material_index)))
                 } else {
                     return None
                 }    
             }
             let hitfo = self.submit_hitfo(ray, materials, t, child_mask, false, self.get_material_index(child_mask));
-            return Some((hitfo, None))
+            return Some((hitfo, None, None))
         }
         None
     }
@@ -377,6 +390,52 @@ impl VoxelOctreeBranch {
         None
     }
 
+    // same as normal hit func but some differences for reflective voxels
+    pub fn hit_reflective(&self, ray: &Ray, materials: &Vec<Material>, t: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, t_correction: f64, mut depth: Option<u16>, current_material_index: u16) -> Option<RayHitfo> {
+        depth = depth.map(|x| x-1);
+        let tm = (t0.0 + dt.x, t0.1 + dt.y, t0.2 + dt.z);
+        let t1 = (tm.0 + dt.x, tm.1 + dt.y, tm.2 + dt.z);
+        let ts = t.get_next_hits(vec![tm.0, tm.1, tm.2, t1.0, t1.1, t1.2]);
+        let dt_by_2 = *dt*0.5;
+
+        let entry_child_mask = if tm.0.t < t.t {tm.0.plane} else {!tm.0.plane}
+                             & if tm.1.t < t.t {tm.1.plane} else {!tm.1.plane}
+                             & if tm.2.t < t.t {tm.2.plane} else {!tm.2.plane};
+        if let Some(hitfo) = self.try_hit_reflective_subvoxel(entry_child_mask, ray, materials, t, ts[0], t0, dt, &dt_by_2, t_correction, depth, current_material_index) {
+            return Some(hitfo)
+        }
+        
+        let mut child = entry_child_mask;
+        for i in 0..3 {
+            match self.get_next_voxel(child, ts[i], t0) {
+                Some(next) => child = next,
+                None => return None,
+            }
+            if let Some(hitfo) = self.try_hit_reflective_subvoxel(child, ray, materials, ts[i], ts[i+1], t0, dt, &dt_by_2, t_correction, depth, current_material_index) {
+                return Some(hitfo)
+            }
+        }
+        None
+    }
+
+    // after reflection, the ray might pass from inside of some voxels(custom normals) so they should be ignored
+    #[inline(always)]
+    pub fn try_hit_reflective_subvoxel(&self, child_mask: u8, ray: &Ray, materials: &Vec<Material>, t: BbHit, ts_p1: BbHit, t0: (BbHit, BbHit, BbHit), dt: &Vec3d, dt_by_2: &Vec3d, t_correction: f64, depth: Option<u16>, current_material_index: u16) -> Option<RayHitfo> {
+        if ts_p1.t < t_correction {return None}
+        if depth != Some(0) && child_mask & self.branch_mask > 0 {
+            let child = self.get_branch(child_mask);
+            let t0 = self.get_t0_for(child_mask, dt, t0);
+            if let Some(hitfo) = child.hit_reflective(ray, materials, t, t0, dt_by_2, t_correction, depth, current_material_index) {
+                return Some(hitfo)
+            }
+        } else if child_mask & self.child_mask > 0 {
+            return None
+        } else {
+            return Some(self.submit_hitfo(ray, materials, t, child_mask, false, current_material_index))
+        }
+        None
+    }
+    
     #[inline(always)]
     pub fn submit_hitfo(&self, ray: &Ray, materials: &Vec<Material>, t: BbHit, child_mask: u8, flip_normal: bool, material_index: u16) -> RayHitfo {
         let mut ray = ray.clone();

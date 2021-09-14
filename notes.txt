@@ -2,13 +2,14 @@
 plan:
   . BUGS!!!!
     . metal reflection causes wierd black voxelsb(if normals come from triangles)
-      . its partly because of how the metal.scatter works. if normal.raydir isnt -ve then it returns None.
+      . this but still persists after the fixes. not sure about the reason
+      /. its partly because of how the metal.scatter works. if normal.raydir isnt -ve then it returns None.
         but patching this dosent help too much either. also a part of reason is that after reflection, the rays hit other voxels
         but between the current voxel and the voxel next to it.
-        . the second porblem can be handled by another ray hit implimentation like the transparent one, but this is ugly.
-        . maybe can solve with different material implementation for voxels -> metalVoxel
+        /. the second porblem can be handled by another ray hit implimentation like the transparent one, but this is ugly.
+        /. maybe can solve with different material implementation for voxels -> metalVoxel
       . same for dielectric
-      . try making a sphere with voxels. maybe the normals of triangles makes it worse
+        . donno how to fix this
     . when camera is right on a face of voxelOctree, things dont render correctly
       . observed with oldMan model at 1.0 z when octree was 2.0 sized
   . a stats structure where stats are collected

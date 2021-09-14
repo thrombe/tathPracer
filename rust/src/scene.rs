@@ -11,7 +11,7 @@ use super::objects::{Object, Sphere, Plane};
 use super::voxel_octree::{VoxelOctree};
 use super::object_octree::ObjectOctree;
 use super::triangle_octree::{Triangle, TriangleOctree};
-use super::material::{Material, Lambertian, Metal, Dielectric, Lit};
+use super::material::{Material, Lambertian, Metal, MetalVoxel, Dielectric, Lit};
 
 
 pub fn gen_world() -> World {
@@ -205,21 +205,22 @@ fn spheres() -> World {
 
 fn voxel_octree() -> World {
 
-    let width = 720;
-    let height = 480;
+    let res_mul = 2;
+    let width = 720*res_mul;
+    let height = 480*res_mul;
     let fov = PI/3.0;
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 10;
     let aperture = 0.0;
     let cam_position = Vec3d::new(1.3, 0.7, 4.0);
     let look_at = Vec3d::new(0.0, 0.0, 0.0);
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
-        octree: ObjectOctree::new(Vec3d::zero(), 100.0),
+        octree: ObjectOctree::new(Vec3d::zero(), 2.0),
     };
     // world.cam.bouncy_depth = 1000;
 
-    let mut oct = VoxelOctree::new(Vec3d::zero(), 2.0, Some(1));
+    let mut oct = VoxelOctree::new(Vec3d::zero(), 2.0, Some(4));
     
     let material = Material::Lambertian(Lambertian {
         color: Vec3d::new(0.7, 0.4, 0.7),
@@ -227,9 +228,10 @@ fn voxel_octree() -> World {
     let material_index = oct.add_material(material);
 
     // let material = Material::Lambertian(Lambertian {
-    let material = Material::Dielectric(Dielectric {
-        color: Vec3d::new(0.99, 0.9, 0.9),
-        refractive_index: 1.3,
+    // let material = Material::Dielectric(Dielectric {
+    let material = Material::MetalVoxel(MetalVoxel {
+        color: Vec3d::new(0.7, 0.6, 0.8),
+        // refractive_index: 1.3,
         fuzz: 0.0,
     });
     let material_index2 = oct.add_material(material);
@@ -240,15 +242,16 @@ fn voxel_octree() -> World {
     //     let point = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), 0.01);
     //     oct.insert_voxel(point, 1, material_index, None);
     // }
-    for _ in 0..500 {
+    for _ in 0..1000000 {
         let point = Vec3d::new(random.sample(&mut rng), random.sample(&mut rng), random.sample(&mut rng));
+        if point.size() > 1.0 {continue}
         let normal = point.clone().unit();
-        oct.insert_voxel(point, 1, material_index2, None);
+        oct.insert_voxel(point, 8, material_index2, Some(normal));
     }
 
-    let point = Vec3d::new(-0.1, 0.01, -0.0);
-    let normal = point.clone();
-    oct.insert_voxel(point, 1, material_index, None);
+    // let point = Vec3d::new(-0.1, 0.01, -0.0);
+    // let normal = point.clone();
+    // oct.insert_voxel(point, 1, material_index, None);
     // let point = Vec3d::new(0.99, 0.99, 0.99);
     // let normal = point.clone();
     // oct.insert_voxel(point, 0, material_index2, None);
@@ -273,14 +276,14 @@ fn voxel_octree() -> World {
 
 fn triangle_octree() -> World {
 
-    let res_mul = 2;
+    let res_mul = 1;
     let width = 720*res_mul;
     let height = 480*res_mul;
     let fov = PI/3.0;
     let samples_per_pixel = 10;
     let aperture = 0.0;
     let cam_position = Vec3d::new(0.0, 0.7, 1.5);
-    let look_at = Vec3d::new(0.0, 0.4, 0.0);
+    let look_at = Vec3d::new(0.0, 0.3, 0.0);
 
     let mut world = World {
         cam: Camera::new(width, height, fov, samples_per_pixel, aperture, cam_position, look_at),
@@ -289,12 +292,13 @@ fn triangle_octree() -> World {
 
     let mut oct = TriangleOctree::new(Vec3d::zero(), 2.0);
     
-    let material = Material::Lambertian(Lambertian {
+    // let material = Material::Lambertian(Lambertian {
     // let material = Material::Dielectric(Dielectric {
-    // let material = Material::Metal(Metal {
-            color: Vec3d::new(0.7, 0.4, 0.7),
+    let material = Material::MetalVoxel(MetalVoxel {
+            // color: Vec3d::new(0.99, 0.89, 0.89),
+            color: Vec3d::new(0.8, 0.6, 0.85),
             // refractive_index: 1.3,
-            // fuzz: 0.0,
+            fuzz: 0.0,
         });
     let material_index = oct.add_material(material);
     
@@ -302,7 +306,7 @@ fn triangle_octree() -> World {
 
     world.octree.insert_object(
         // Object::TriangleOctree(oct)
-        Object::VoxelOctree(oct.voxelise(7, !true))
+        Object::VoxelOctree(oct.voxelise(9, true))
     );
 
     world
