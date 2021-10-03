@@ -101,6 +101,13 @@ todo/ideas:
       . maybe have a info struct or something that is stored in the main struct in a box
     . maybe use Box<dyn trait> instead?
   . different way of collecting color
+    . no. of bounces can be variable per ray
+      . bouncing can end either if ray hits lit object, or if it has so many objects that even if it were to
+        hit a lit object next, it would look black (tho this would depend on how lit of lit object is)
+        so maybe if the color_vec.size() goes below some thteshold, they ray is considered absorbed
+        (instead of having a bounce limit after which it is considered absorbed)
+      . by doing this, things like glass can be maybe rendered with more bounces (since color is closish to 1)
+      . there still has to be some kind of bounce limit to prevent infinite run time
     . travelling through smoke- some amount of every ray is bounces cuz of the partiles in air, some passes through
       maybe this way so many rays are not needed ? idk
     . transparent surface - some part of ray is reflected and some is refracted
@@ -143,6 +150,9 @@ todo/ideas:
   . more shapes
     . rays/lines (will be cool to view rays)
       . how? these are a bit too thin
+      . raymarch them - smol cylenders
+        . project ray.pos on line and then use sphere sdf
+    . torus - project ray.pos on a plane, then project it on a circle vec.unit() * radius. and then use sphere sdf
     . lens
       . this is just the intersection of 2 spheres, so its only where t for both exists for a ray
         but some more constraints are needed, like maybe it should hit outer of sp1 and then inner of sp2
