@@ -148,6 +148,13 @@ todo/ideas:
         . color
     . how do i make the objects teleport through these?
   . more shapes
+    . 3d metaballs
+      . basically the total potential of multiple objects (balls) and limit at at some value
+      . can do with anything where a potential type function can be defined
+      . eg: (this is in 2d)
+        . abs(1.0/sqrt((x-p)*(x-p) + y*y) + 1.0/sqrt((x+p)*(x+p) + y*y))
+        . p is some arbitary value
+        . floor this value and color if >= 1
     . rays/lines (will be cool to view rays)
       . how? these are a bit too thin
       . raymarch them - smol cylenders

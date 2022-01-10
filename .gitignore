@@ -1,4 +1,6 @@
-images
+images/*
+!images/image*.jpeg
+
 target
 others_implementations
 
